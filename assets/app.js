@@ -151,6 +151,8 @@ function authErrorMessage(error) {
   if (/database error/i.test(message))
     return "Registrierung fehlgeschlagen. Ist der Discord-Name eventuell schon vergeben?";
   if (/password/i.test(message)) return "Das Passwort ist zu kurz – mindestens 6 Zeichen.";
+  if (/email not confirmed/i.test(message))
+    return "Das Konto ist noch nicht bestätigt. Bitte wende dich an einen Admin.";
   if (/rate limit|too many/i.test(message)) return "Zu viele Versuche. Bitte kurz warten.";
   return message || "Unbekannter Fehler. Bitte erneut versuchen.";
 }
@@ -292,13 +294,25 @@ async function signUp(discord, roblox, password) {
 
   if (data?.session) {
     await handleAuth();
-  } else {
-    state.screen = "auth";
-    state.authMode = "login";
-    state.authError =
-      "Das Konto wurde angelegt, aber die Anmeldung ist noch nicht aktiv. Bitte wende dich an einen Admin.";
-    render();
+    return;
   }
+
+  // Falls "Confirm email" im Projekt aktiv ist, liefert signUp keine Sitzung.
+  // Das Konto ist dank Datenbank-Trigger trotzdem sofort bestätigt.
+  const retry = await sb.auth.signInWithPassword({
+    email: emailFor(discord),
+    password,
+  });
+  if (!retry.error && retry.data?.session) {
+    await handleAuth();
+    return;
+  }
+
+  state.screen = "auth";
+  state.authMode = "login";
+  state.authError =
+    "Das Konto wurde angelegt. Bitte melde dich jetzt mit deinem Discord-Namen und Passwort an.";
+  render();
 }
 
 async function signOut() {
