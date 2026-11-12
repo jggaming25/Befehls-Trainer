@@ -1,7 +1,7 @@
 /* Öffentliche Supabase-Konfiguration.
    Der Publishable Key darf im Browser sichtbar sein; der Secret Key niemals. */
 window.BEFEHLSTRAINER_CONFIG = {
-  supabaseUrl: "https://bklvnjkexdswmxkgrroh.supabase.co",
-  supabaseKey: "sb_publishable_mGx8fwGX2pShWLptiY8B3A_UtebEdef",
+  supabaseUrl: "https://zdemeuejvzweilikllef.supabase.co",
+  supabaseKey: "sb_publishable_J7eKMCSPQt0epFd0275SUA_hnhx_HTM",
   scenariosPerRun: 10,
 };

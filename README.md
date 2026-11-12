@@ -42,7 +42,8 @@ Danach <http://localhost:8080> öffnen. Das Backend ist bereits in
 
 ## Supabase
 
-Projekt: `befehlstrainer` (`bklvnjkexdswmxkgrroh`, Region `eu-central-1`).
+Projekt-Ref: `zdemeuejvzweilikllef` (URL `https://zdemeuejvzweilikllef.supabase.co`).
+Die öffentliche Konfiguration steht in `assets/config.js`.
 
 ### Schema
 
@@ -56,7 +57,7 @@ Die Migrationen liegen unter `supabase/migrations`:
 Einspielen:
 
 ```powershell
-npx supabase link --project-ref bklvnjkexdswmxkgrroh
+npx supabase link --project-ref zdemeuejvzweilikllef
 npx supabase db push --remote
 ```
 
