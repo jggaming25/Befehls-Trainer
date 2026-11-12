@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Befehlstrainer – Digitaler Befehl üben</title>
+    <meta
+      name="description"
+      content="Befehlstrainer für den Digitalen Befehl: realistische Situationen mit Streckenbild, Befehlseingabe und logischer Auswertung. Anmeldung über Discord- und Roblox-Namen."
+    />
+    <meta name="theme-color" content="#11161d" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="appbar">
+      <div class="appbar-inner">
+        <button class="brand" type="button" aria-label="Zur Startseite">
+          <span class="brand-mark" aria-hidden="true">B</span>
+          <span class="brand-text">
+            <strong>Befehlstrainer</strong>
+            <small>DVN FIS · Übungsmodus</small>
+          </span>
+        </button>
+
+        <div class="appbar-progress" id="header-progress" hidden>
+          <span class="progress-label" id="header-progress-label">Situation 1 / 10</span>
+          <span class="progress-track"><span class="progress-bar" id="header-progress-bar"></span></span>
+        </div>
+
+        <div class="appbar-actions">
+          <span class="score-pill" id="header-score" hidden>
+            <span class="score-pill-dot"></span><strong>0</strong> P
+          </span>
+          <span class="user-chip" id="user-chip" hidden></span>
+          <button class="btn btn-ghost btn-sm" type="button" data-action="reference" id="reference-button" hidden>
+            Befehlsübersicht
+          </button>
+          <button class="btn btn-ghost btn-sm" type="button" id="admin-button" hidden>Admin</button>
+          <button class="btn btn-dark btn-sm" type="button" id="header-end" hidden>Beenden</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="logout-button" hidden>Abmelden</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="app" aria-live="polite"></main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>
+          <strong>Befehlstrainer</strong> · Übungsprojekt nach dem Muster des Digitalen Befehls.
+          Kein offizielles DVN-FIS-System, alle Angaben ohne Gewähr.
+        </span>
+        <span>Konten und Befehle in Supabase · Trainingsergebnisse werden nicht gespeichert</span>
+      </div>
+    </footer>
+
+    <dialog id="reference-modal" class="modal" aria-labelledby="reference-title">
+      <div class="modal-head">
+        <h2 id="reference-title">Befehlsübersicht</h2>
+        <button class="modal-close" type="button" data-close aria-label="Schließen">×</button>
+      </div>
+      <div class="modal-search">
+        <input
+          id="cmd-search"
+          type="search"
+          placeholder="Befehl suchen – z. B. Gegengleis, Signal, Geschwindigkeit …"
+          aria-label="Befehl suchen"
+        />
+      </div>
+      <div class="modal-body" id="reference-list"></div>
+    </dialog>
+
+    <dialog id="confirm-modal" class="modal modal-small" aria-labelledby="confirm-title">
+      <div class="confirm-body">
+        <h2 id="confirm-title">Training beenden?</h2>
+        <p>
+          Nicht bearbeitete Situationen werden mit 0 Punkten gewertet. Deine bisherige
+          Auswertung bleibt auf dieser Seite sichtbar.
+        </p>
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" type="button" data-action="cancel-end">Weiter üben</button>
+          <button class="btn btn-primary" type="button" data-action="confirm-end">Beenden</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="assets/config.js"></script>
+    <script src="assets/data.js"></script>
+    <script src="assets/scenes.js"></script>
+    <script src="assets/generator.js"></script>
+    <script src="assets/generator2.js"></script>
+    <script src="assets/vendor/supabase.js"></script>
+    <script src="assets/app.js" defer></script>
+  </body>
+</html>
