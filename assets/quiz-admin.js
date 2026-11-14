@@ -506,8 +506,9 @@ function quizAdminSettings() {
           <input data-qs="mc_11_plus_minutes" type="number" min="0.5" step="0.5" value="${quizNum(s.mc_11_plus_minutes)}" />
         </label>
         <label class="field">
-          <span class="field-label">Bestehensgrenze (%)</span>
+          <span class="field-label">Empfohlene Bestehensgrenze (%)</span>
           <input data-qs="pass_percent" type="number" min="0" max="100" step="1" value="${quizNum(s.pass_percent)}" />
+          <small class="field-note">Nur Empfehlung – bestanden/nicht bestanden entscheidet der Admin bei der Bewertung.</small>
         </label>
         <label class="field">
           <span class="field-label">Aufbewahrung (Wochen)</span>
@@ -587,9 +588,13 @@ function quizAdminGrading() {
     <div class="admin-panel-head">
       <div>
         <h2>Abgegebene Versuche</h2>
-        <p class="panel-hint">Multiple Choice ist automatisch bewertet. Offene Freitext- und Befehlsaufgaben hier manuell bewerten.</p>
+        <p class="panel-hint">Multiple Choice ist automatisch bewertet. Offene Freitext- und Befehlsaufgaben hier manuell bewerten. Über Bestanden entscheidet der Admin – die Prozentgrenze ist nur eine Empfehlung.</p>
       </div>
-      <button class="btn btn-ghost btn-sm" type="button" data-quiz-admin="reload" data-section="quiz-grading">Aktualisieren</button>
+      <div class="panel-actions">
+        <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="export-results">Ergebnisse (CSV)</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="export-details">Details (CSV)</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-quiz-admin="reload" data-section="quiz-grading">Aktualisieren</button>
+      </div>
     </div>
     <div class="admin-table quiz-attempt-table">
       <div class="admin-table-head grading-head">
@@ -604,12 +609,15 @@ function quizAdminGrading() {
           <span class="admin-table-title"><strong>${e(names[a.user_id] || "Unbekannt")}</strong><small>${e(quizFormatDate(a.started_at))}</small></span>
           <span>${e(quizFormatDate(a.submitted_at))}</span>
           <span>${quizStatusPill(a.status)}</span>
-          <span>${a.percentage == null ? "—" : `${quizFmt(a.total_points)} / ${quizFmt(a.max_points)} · ${quizFmt(a.percentage)} %`}</span>
+          <span>${a.percentage == null ? "—" : `${quizFmt(a.total_points)} / ${quizFmt(a.max_points)} · ${quizFmt(a.percentage)} %`}
+            ${a.status === "graded" ? (quizPassDecided(a) ? (a.passed ? ` <span class="status-pill ok">bestanden</span>` : ` <span class="status-pill bad">nicht bestanden</span>`) : ` <span class="status-pill wait">Entscheidung offen</span>`) : ""}
+          </span>
           <span>${a.flag ? `<span class="status-pill bad">${e(QUIZ_FLAG_LABELS[a.flag] || a.flag)}</span>` : "—"}</span>
           <span class="admin-row-actions">
             <button class="link-btn" type="button" data-quiz-admin="open-grading" data-id="${e(a.id)}">
               ${a.status === "graded" ? "Neu bewerten" : "Bewerten"}
             </button>
+            <button class="link-btn danger" type="button" data-quiz-admin="delete-attempt" data-id="${e(a.id)}">Löschen</button>
           </span>
         </div>`
               )
@@ -653,6 +661,9 @@ function quizAdminGradingEditor() {
   const attempt = quizState.admin.grading;
   const review = Array.isArray(attempt.review) ? attempt.review : [];
   const names = quizState.admin.names || {};
+  const threshold = quizNum(quizState.settings?.pass_percent ?? 60);
+  const recommended = quizNum(attempt.percentage) >= threshold;
+  const decided = typeof attempt.passed === "boolean";
   return `
   <section class="card admin-panel">
     <div class="admin-panel-head">
@@ -705,6 +716,28 @@ function quizAdminGradingEditor() {
           )
           .join("")}
       </div>
+      <div class="grading-decision">
+        <div class="grading-decision-head">
+          <span class="field-label">Bestehensentscheidung (manuell)</span>
+          <p class="panel-hint">
+            Empfehlung: <strong>${threshold} %</strong> – erreicht: ${recommended ? "ja" : "nein"}
+            (${quizFmt(attempt.percentage)} %). Die Entscheidung trifft der Admin.
+          </p>
+        </div>
+        <div class="decision-options">
+          <label class="check compact">
+            <input type="radio" name="quiz-passed" value="yes" ${decided && attempt.passed ? "checked" : ""}>
+            <span class="check-box" aria-hidden="true"></span>
+            <span class="check-text">Bestanden</span>
+          </label>
+          <label class="check compact">
+            <input type="radio" name="quiz-passed" value="no" ${decided && !attempt.passed ? "checked" : ""}>
+            <span class="check-box" aria-hidden="true"></span>
+            <span class="check-text">Nicht bestanden</span>
+          </label>
+        </div>
+        <small class="decision-hint">Ohne Auswahl wird die Bewertung nicht gespeichert.</small>
+      </div>
       <label class="field">
         <span class="field-label">Anmerkung zur Bewertung (für den Teilnehmer sichtbar)</span>
         <textarea id="quiz-grade-note" rows="3">${e(attempt.grading_note || "")}</textarea>
@@ -740,11 +773,18 @@ async function quizSaveGrading() {
     points[input.dataset.grade] = quizNum(input.value);
   });
   const note = document.getElementById("quiz-grade-note")?.value || "";
+  const passInput = document.querySelector('input[name="quiz-passed"]:checked');
+  if (!passInput) {
+    showToast("Bitte „Bestanden“ oder „Nicht bestanden“ wählen.");
+    return;
+  }
+  const passed = passInput.value === "yes";
   try {
     const { data, error } = await sb.rpc("grade_quiz_attempt", {
       p_attempt: attempt.id,
       p_points: points,
       p_note: note,
+      p_passed: passed,
     });
     if (error) throw error;
     quizState.admin.grading = null;
@@ -760,6 +800,157 @@ async function quizSaveGrading() {
       "Die Bewertung konnte nicht gespeichert werden. Bitte wende dich an Admin Jann (Discord: jlg09) per DM oder an den DVN-Discord im Staff-Bereich."
     );
   }
+}
+
+/* --------------------------------------------------------------------------
+   Export (CSV)
+   -------------------------------------------------------------------------- */
+function quizCsvCell(value) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function quizDownloadCsv(filename, rows) {
+  const content = "\uFEFF" + rows.map((row) => row.map(quizCsvCell).join(";")).join("\r\n");
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function quizCsvDate() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function quizAnswerText(item) {
+  const value = item.value;
+  if (item.type === "multiple_choice") {
+    const chosen = Array.isArray(value) ? value : [];
+    const options = Array.isArray(item.options) ? item.options : [];
+    return chosen
+      .map((id) => options.find((option) => option.id === id)?.label || id)
+      .join(", ");
+  }
+  if (item.type === "short" || item.type === "long") {
+    return typeof value === "string" ? value.trim() : "";
+  }
+  if (item.type === "command") {
+    const answer = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const command = answer.command ? getCommand(answer.command) : null;
+    const parts = [command ? `Befehl ${command.nr} – ${command.title}` : "kein Befehl"];
+    if (command) {
+      command.fields.forEach((field) => parts.push(`${field.label}: ${answer.fields?.[field.id] || "—"}`));
+      const checked = command.measures
+        .filter((m) => answer.measures?.[m.id])
+        .map((m) => m.label);
+      if (checked.length) parts.push(`Maßnahmen: ${checked.join(" | ")}`);
+    }
+    return parts.join(" · ");
+  }
+  return "";
+}
+
+function quizExportResults() {
+  const attempts = (quizState.admin.attempts || []).filter((a) => a.status === "graded");
+  if (!attempts.length) {
+    showToast("Noch keine fertig bewerteten Ergebnisse.");
+    return;
+  }
+  const names = quizState.admin.names || {};
+  const threshold = quizNum(quizState.settings?.pass_percent ?? 60);
+  const header = [
+    "Teilnehmer",
+    "Gestartet",
+    "Abgegeben",
+    "Bewertet am",
+    "Bewertet von",
+    "Punkte",
+    "Max. Punkte",
+    "Prozent",
+    "Empfehlung (%)",
+    "Empfehlung erreicht",
+    "Entscheidung",
+    "Auffälligkeit",
+    "Anmerkung",
+    "Aufbewahrung bis",
+  ];
+  const rows = attempts.map((a) => [
+    names[a.user_id] || a.user_id,
+    quizFormatDate(a.started_at),
+    quizFormatDate(a.submitted_at),
+    quizFormatDate(a.graded_at),
+    a.graded_by_name || "",
+    quizFmt(a.total_points),
+    quizFmt(a.max_points),
+    quizFmt(a.percentage),
+    threshold,
+    quizNum(a.percentage) >= threshold ? "ja" : "nein",
+    typeof a.passed === "boolean" ? (a.passed ? "bestanden" : "nicht bestanden") : "offen",
+    a.flag ? QUIZ_FLAG_LABELS[a.flag] || a.flag : "",
+    a.grading_note || "",
+    quizFormatDate(a.retention_until),
+  ]);
+  quizDownloadCsv(`befehlstrainer-ergebnisse-${quizCsvDate()}.csv`, [header, ...rows]);
+  showToast(`${attempts.length} bewertete Ergebnisse exportiert.`);
+}
+
+function quizExportDetails() {
+  const attempts = (quizState.admin.attempts || []).filter((a) => a.status === "graded");
+  if (!attempts.length) {
+    showToast("Noch keine fertig bewerteten Ergebnisse.");
+    return;
+  }
+  const names = quizState.admin.names || {};
+  const header = [
+    "Teilnehmer",
+    "Gestartet",
+    "Frage",
+    "Typ",
+    "Punkte",
+    "Max. Punkte",
+    "Antwort",
+    "Musterlösung / Hinweis",
+    "Entscheidung",
+  ];
+  const rows = [];
+  attempts.forEach((attempt) => {
+    (Array.isArray(attempt.review) ? attempt.review : []).forEach((item) => {
+      const points =
+        item.auto_points != null
+          ? quizNum(item.auto_points)
+          : item.manual_points != null
+          ? quizNum(item.manual_points)
+          : "";
+      rows.push([
+        names[attempt.user_id] || attempt.user_id,
+        quizFormatDate(attempt.started_at),
+        item.prompt || "",
+        QUIZ_TYPE_LABELS[item.type] || item.type || "",
+        points,
+        quizNum(item.points),
+        quizAnswerText(item),
+        item.reference_answer || "",
+        typeof attempt.passed === "boolean"
+          ? attempt.passed
+            ? "bestanden"
+            : "nicht bestanden"
+          : "offen",
+      ]);
+    });
+  });
+  if (!rows.length) {
+    showToast("Keine Detaildaten zum Export gefunden.");
+    return;
+  }
+  quizDownloadCsv(`befehlstrainer-details-${quizCsvDate()}.csv`, [header, ...rows]);
+  showToast(`${rows.length} Antworten exportiert.`);
 }
 
 /* --------------------------------------------------------------------------
@@ -805,7 +996,7 @@ function quizAdminAccounts() {
     <div class="admin-panel-head">
       <div>
         <h2>Konten</h2>
-        <p class="panel-hint">Konten deaktivieren, Passwörter zurücksetzen, Prüfungen anfordern und Zusatzversuche freigeben.</p>
+        <p class="panel-hint">Konten deaktivieren, Passwörter zurücksetzen, Prüfungen anfordern und Zusatzversuche freigeben. „Konto löschen“ entfernt das Konto endgültig aus Supabase (Auth-Konto, Profil und alle Versuche).</p>
       </div>
       <button class="btn btn-ghost btn-sm" type="button" data-quiz-admin="reload" data-section="accounts">Aktualisieren</button>
     </div>
@@ -855,6 +1046,7 @@ function quizAdminAccounts() {
                 <input class="account-note" type="text" data-account-note="${e(account.id)}" placeholder="Notiz (optional)" maxlength="200" aria-label="Notiz" />
                 <button class="link-btn" type="button" data-quiz-admin="require-quiz" data-id="${e(account.id)}">Prüfung anfordern</button>
                 ${account.quiz_required ? `<button class="link-btn danger" type="button" data-quiz-admin="clear-requirement" data-id="${e(account.id)}">Anforderung entfernen</button>` : ""}
+                <button class="link-btn danger" type="button" data-quiz-admin="delete-account" data-id="${e(account.id)}" data-name="${e(account.discord_username)}" ${isSelf ? "disabled" : ""}>Konto löschen</button>
               </div>
             </span>
           </div>`;
@@ -907,6 +1099,24 @@ async function quizAccountAction(action, id, dataset = {}) {
       const { data, error } = await sb.rpc("grant_quiz_attempt", { target: id });
       if (error) throw error;
       showToast(`Weiterer Versuch freigegeben (${data}).`);
+    } else if (action === "delete-account") {
+      const name = dataset.name || "";
+      const typed = window.prompt(
+        `Konto „${name}“ endgültig löschen?\n\n` +
+          "Dabei werden Auth-Konto, Profil und alle Versuche in Supabase gelöscht. " +
+          "Diese Aktion kann nicht rückgängig gemacht werden.\n\n" +
+          "Zur Bestätigung den Discord-Namen eingeben:",
+        ""
+      );
+      if (typed === null) return;
+      if (typed.trim().toLowerCase() !== name.toLowerCase()) {
+        showToast("Der eingegebene Name stimmt nicht überein. Konto nicht gelöscht.");
+        return;
+      }
+      const { error } = await sb.rpc("admin_delete_account", { target: id });
+      if (error) throw error;
+      quizState.admin.otp = null;
+      showToast(`Konto „${name}“ wurde vollständig gelöscht.`);
     }
     quizState.admin.loadedFor = null;
     await quizAdminLoad("accounts");
@@ -1013,6 +1223,30 @@ function quizAdminBindEvents() {
       if (input) input.value = actionEl.dataset.minutes || "";
       return;
     }
+    if (action === "export-results") {
+      quizExportResults();
+      return;
+    }
+    if (action === "export-details") {
+      quizExportDetails();
+      return;
+    }
+    if (action === "delete-attempt") {
+      if (!window.confirm("Diesen Versuch endgültig löschen? Auswertung und Antworten werden entfernt.")) return;
+      sb.rpc("admin_delete_attempt", { p_attempt: id }).then(({ error }) => {
+        if (error) {
+          console.error(error);
+          showToast(error.message || "Der Versuch konnte nicht gelöscht werden.");
+          showContact("Der Versuch konnte nicht gelöscht werden.");
+          return;
+        }
+        quizState.admin.loadedFor = null;
+        quizState.loaded = false;
+        quizAdminLoad("quiz-grading").then(() => render());
+        showToast("Versuch gelöscht.");
+      });
+      return;
+    }
     if (action === "open-grading") {
       quizOpenGrading(id);
       return;
@@ -1022,7 +1256,7 @@ function quizAdminBindEvents() {
       render();
       return;
     }
-    if (action === "toggle-account" || action === "reset-password" || action === "require-quiz" || action === "clear-requirement" || action === "grant-attempt") {
+    if (action === "toggle-account" || action === "reset-password" || action === "require-quiz" || action === "clear-requirement" || action === "grant-attempt" || action === "delete-account") {
       quizAccountAction(action, id, actionEl.dataset);
       return;
     }

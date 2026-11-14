@@ -26,12 +26,17 @@ Eingabefelder und Situationen in Supabase anlegen.
   in der aktuellen Fassung und ohne die Seite zu verlassen
 - **Quiz/Prüfung** zum Betriebsregelwerk: Multiple Choice (automatisch),
   Kurz-/Langantwort und Befehlserstellung (manuell durch Admins)
-- **Auswertungen** mit Gesamtpunkten, Prozentwert, Bestehensgrenze,
+- **Auswertungen** mit Gesamtpunkten, Prozentwert, Empfehlung,
   Bewertungsanmerkung und bewertender Person
+- **Manuelle Bestehensentscheidung:** Die Prozentgrenze ist nur eine Empfehlung;
+  ob ein Versuch bestanden ist, entscheidet der Admin bei der Bewertung
 - **Admin-Bereich** für Anfragen, Befehle/Eingabefelder, eigene Situationen,
   Quizfragen, Bewertungen, Quiz-Einstellungen und Konten
 - **Kontoverwaltung:** deaktivieren, Passwort per Einmalpasswort zurücksetzen,
-  Prüfung mit Frist anfordern, Zusatzversuch freigeben
+  Prüfung mit Frist anfordern, Zusatzversuch freigeben und Konten vollständig
+  löschen (Auth-Konto, Profil und alle Versuche in Supabase)
+- **Ergebnis-Export** als CSV: eine Übersicht aller bewerteten Versuche und ein
+  Detail-Export mit jeder Antwort und Musterlösung
 - **Auswertung:** Befehlswahl 4 P., Angaben und Zusatzmaßnahmen zusammen 6 P.
 - **Keine Speicherung von Trainingsergebnissen:** nur Konten, Quizversuche und
   Admin-Inhalte liegen in Supabase; der Trainingszustand bleibt im Browser
@@ -66,6 +71,8 @@ Die Migrationen liegen unter `supabase/migrations`:
 | `20261113120000_quiz_accounts.sql` | Quiz, Auswertungen, Kontosperre, Einmalpasswörter, RLS |
 | `20261113121000_seed_quiz.sql` | Startfragen für das Quiz (57 Punkte) |
 | `20261113130000_fix_account_sessions.sql` | Korrektur der Session-Bereinigung beim Deaktivieren/Zurücksetzen |
+| `20261114120000_manual_pass_export_delete.sql` | Manuelle Bestehensentscheidung, Löschen von Versuchen und Konten |
+| `20261114130000_fix_grade_review.sql` | Manuelle Punkte auch in der Einzelauswertung speichern |
 
 Einspielen:
 
@@ -116,8 +123,12 @@ laufenden Quiz ist der Tab gesperrt.
 
 - **Fragetypen:** Multiple Choice (automatisch), Kurzantwort, Langantwort und
   Befehlserstellung (manuell durch Admins)
-- **Punkte und Ergebnis:** Gesamtpunkte, Prozentwert, Bestehensgrenze,
+- **Punkte und Ergebnis:** Gesamtpunkte, Prozentwert, empfohlene Bestehensgrenze,
   Bewertungsanmerkung und bewertende Person werden in jeder Auswertung angezeigt
+- **Bestehensentscheidung:** Die Prozentgrenze (Standard 60 %) ist nur eine
+  Empfehlung. Der Admin wählt bei jeder Bewertung verbindlich „Bestanden“ oder
+  „Nicht bestanden“; ohne Auswahl wird nicht gespeichert. Bis zur Entscheidung
+  zeigt die Auswertung „Entscheidung offen“.
 - **Zeitwerte:** Kurzantwort 1,5 Min., Langantwort 4 Min., Multiple Choice
   0,5 Min. (bis 4 Optionen), 1 Min. (bis 10 Optionen), 2 Min. (mehr Optionen).
   Der Admin sieht daraus eine vorgeschlagene Gesamtzeit und kann sie übernehmen
@@ -155,6 +166,27 @@ Vollständiger Schutz ist nur mit einer kontrollierten Prüfungsumgebung möglic
 
 Kann etwas nicht gespeichert werden, zeigt die Seite denselben Kontakt-Hinweis.
 
+### Konten und Daten löschen
+
+- **Versuch löschen:** Admin → **Bewertungen** → **Löschen** entfernt einen
+  einzelnen Versuch samt Antworten und Auswertung.
+- **Konto löschen:** Admin → **Konten** → **Konto löschen** entfernt nach
+  Eingabe des Discord-Namens das Auth-Konto in Supabase; Profil und alle
+  Versuche werden per `on delete cascade` mitgelöscht.
+- Das eigene Konto und das letzte verbleibende Admin-Konto können nicht
+  gelöscht werden.
+
+### Ergebnis-Export
+
+Admin → **Bewertungen**:
+- **Ergebnisse (CSV):** Teilnehmer, Zeiten, Punkte, Prozent, Empfehlung,
+  Entscheidung, Auffälligkeit, Anmerkung und Aufbewahrungsdatum
+- **Details (CSV):** jede Frage mit Antwort, vergebener Punktzahl und
+  Musterlösung bzw. Bewertungshinweis
+
+Die Dateien sind UTF-8 mit BOM und `;` als Trennzeichen, damit sie in deutschen
+Excel-Versionen direkt korrekt geöffnet werden.
+
 ## Veröffentlichen
 
 1. Änderungen nach `main` pushen.
@@ -187,6 +219,9 @@ supabase/migrations/           Datenbankschema, Seeds und Korrekturen
 - Lösungen der Quizfragen und Musterlösungen liegen in `quiz_attempt_keys`
   bzw. in der Admin-Sicht `quiz_questions_admin`; Teilnehmer sehen sie nicht.
 - Einmalpasswörter werden nur einmal ausgegeben und müssen sofort geändert werden.
+- Löschen von Versuchen und Konten läuft über SECURITY-DEFINER-RPCs, die nur
+  Admins ausführen dürfen; das eigene Konto und das letzte Admin-Konto sind
+  geschützt.
 - `.env.local` und Supabase-Temporärdateien sind per `.gitignore` ausgeschlossen.
 
 ## Hinweis

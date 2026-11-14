@@ -36,7 +36,7 @@ const state = {
   queue: [],
   index: 0,
   answers: [],
-  current: { command: null, fields: {}, measures: {} },
+  current: { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" },
   startedAt: null,
   endedAt: null,
   admin: {
@@ -784,28 +784,32 @@ function situationCard(scenario) {
   </section>`;
 }
 
-function commandGrid(selected) {
-  return `
-  <div class="command-grid" role="group" aria-label="Befehl auswählen">
-    ${COMMANDS.map(
-      (cmd) => `
-      <button type="button" class="command-item ${selected === cmd.nr ? "selected" : ""}"
-        data-command="${e(cmd.nr)}" aria-pressed="${selected === cmd.nr}">
-        <span class="cmd-nr">${e(cmd.nr)}</span>
-        <span class="cmd-title">${e(cmd.title)}</span>
-        <span class="cmd-check" aria-hidden="true">✓</span>
-      </button>`
-    ).join("")}
-  </div>`;
+/* --------------------------------------------------------------------------
+   Befehlsvordruck – digitales Abbild des DB-Vordrucks (Ril 408.2411 V01)
+   Vorderseite: Befehle 1–9 · Rückseite: nationale Befehle ab 21
+   -------------------------------------------------------------------------- */
+const VORDRUCK_VORNE = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+function vordruckSectionOf(nr) {
+  return VORDRUCK_VORNE.includes(String(nr)) ? "vorne" : "hinten";
 }
 
-function fieldControl(field, value) {
+function vordruckStruck(nr) {
+  const override = state.current.struck ? state.current.struck[nr] : undefined;
+  if (override === true) return true;
+  if (override === false) return false;
+  return Boolean(state.current.command) && state.current.command !== nr;
+}
+
+function vordruckFieldControl(cmd, field, index) {
+  const value = state.current.fields[field.id] || "";
+  const code = `${cmd.nr}.${String(index + 1).padStart(2, "0")}`;
   return `
-  <label class="field">
-    <span class="field-label">${e(field.label)}</span>
-    <span class="select-wrap">
-      <select data-field="${e(field.id)}" autocomplete="off">
-        <option value="" ${!value ? "selected" : ""} disabled>${e(field.placeholder || "Auswählen")}</option>
+  <label class="vfill">
+    <span class="vfill-label"><span class="vfill-code">${e(code)}</span>${e(field.label)}</span>
+    <span class="vfill-control">
+      <select data-field="${e(field.id)}" autocomplete="off" aria-label="${e(field.label)}">
+        <option value="" ${!value ? "selected" : ""} disabled>${e(field.placeholder || "eintragen …")}</option>
         ${(field.options || [])
           .map(
             (option) =>
@@ -817,20 +821,15 @@ function fieldControl(field, value) {
   </label>`;
 }
 
-function orderForm(command) {
-  const scenario = state.queue[state.index] || {};
-  const fields = command.fields.map(
-    (field, index) => `
-    <div class="vordruck-clause">
-      <span class="clause-nr">${e(command.nr)}.${index + 1}</span>
-      ${fieldControl(field, state.current.fields[field.id] || "")}
-    </div>`
-  );
-  const measures = command.measures.length
+function vordruckFill(cmd) {
+  const fields = (cmd.fields || [])
+    .map((field, index) => vordruckFieldControl(cmd, field, index))
+    .join("");
+  const measures = (cmd.measures || []).length
     ? `
     <fieldset class="vordruck-measures">
-      <legend>Zusatzmaßnahmen / zusätzliche Aufträge</legend>
-      ${command.measures
+      <legend>Zusätzliche Anweisungen</legend>
+      ${cmd.measures
         .map(
           (m) => `
         <label class="check">
@@ -844,21 +843,79 @@ function orderForm(command) {
         .join("")}
     </fieldset>`
     : "";
+  return `
+  <div class="vrow-fill">
+    <p class="vrow-template">${e(cmd.template || cmd.description)}</p>
+    <div class="vfill-grid">${fields}</div>
+    ${measures}
+    <label class="vfill vfill-note">
+      <span class="vfill-label"><span class="vfill-code">96</span>Freitext / zusätzliche Anweisungen</span>
+      <span class="vfill-control">
+        <input type="text" data-note value="${e(state.current.note || "")}" placeholder="optional" autocomplete="off">
+      </span>
+    </label>
+  </div>`;
+}
 
+function vordruckRow(cmd) {
+  const selected = state.current.command === cmd.nr;
+  const struck = vordruckStruck(cmd.nr);
+  return `
+  <div class="vrow ${selected ? "is-selected" : ""} ${struck ? "is-struck" : ""}">
+    <label class="vrow-tick" title="Befehl ${e(cmd.nr)} ankreuzen">
+      <input type="checkbox" data-command="${e(cmd.nr)}" ${selected ? "checked" : ""} aria-label="Befehl ${e(cmd.nr)} – ${e(cmd.title)}">
+      <span class="vrow-box" aria-hidden="true"></span>
+    </label>
+    <span class="vrow-nr">${e(cmd.nr)}</span>
+    <div class="vrow-body" data-command="${e(cmd.nr)}">
+      <div class="vrow-head">
+        <strong>${e(cmd.title)}</strong>
+        <span class="vrow-desc">${e(cmd.description)}</span>
+      </div>
+      ${selected ? vordruckFill(cmd) : ""}
+    </div>
+    <button type="button" class="vrow-strike-btn" data-action="strike-row" data-row="${e(cmd.nr)}"
+      aria-pressed="${struck}" title="${struck ? "Durchstreichung aufheben" : "Zeile durchstreichen"}">${
+    struck ? "↺" : "✕"
+  }</button>
+  </div>`;
+}
+
+function vordruckSection(title, subtitle, commands) {
+  if (!commands.length) return "";
+  return `
+  <section class="vordruck-seite">
+    <header class="vordruck-seite-head">
+      <div>
+        <strong>${e(title)}</strong>
+        <span>${e(subtitle)}</span>
+      </div>
+    </header>
+    <div class="vrow-list">${commands.map(vordruckRow).join("")}</div>
+  </section>`;
+}
+
+function orderForm(command) {
+  const scenario = state.queue[state.index] || {};
+  if (!state.current.kennung) state.current.kennung = `BT-${String(Date.now()).slice(-6)}`;
   const datum = new Date().toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
-  const kennung = `BT-${String(Date.now()).slice(-6)}`;
-  const vordruckField = (code, label, value) => `
-    <div class="vordruck-cell">
+
+  const vordruckField = (code, label, value, wide = false) => `
+    <div class="vordruck-cell${wide ? " vordruck-cell-wide" : ""}">
       <span class="vordruck-code">${e(code)}</span>
       <span class="vordruck-cell-label">${e(label)}</span>
       <strong class="vordruck-cell-value">${e(value || "—")}</strong>
     </div>`;
 
-  return `
+  const vorne = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "vorne");
+  const hinten = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "hinten");
+  const struckCount = COMMANDS.filter((cmd) => vordruckStruck(cmd.nr)).length;
+  const selectedCard = command
+    ? `
   <div class="selected-command">
     <div class="selected-command-main">
       <span class="cmd-nr">${e(command.nr)}</span>
@@ -868,22 +925,25 @@ function orderForm(command) {
       </div>
     </div>
     <button type="button" class="link-btn" data-action="clear-command">Anderer Befehl</button>
-  </div>
-  <p class="command-description">${e(command.description)}</p>
+  </div>`
+    : "";
+
+  return `
+  ${selectedCard}
 
   <form id="befehl-form" novalidate>
-    <article class="vordruck" aria-label="Befehlsvordruck Befehl ${e(command.nr)}">
+    <article class="vordruck" aria-label="Befehlsvordruck ${command ? "Befehl " + e(command.nr) : ""}">
       <header class="vordruck-head">
         <div class="vordruck-brand">
           <span class="vordruck-logo" aria-hidden="true">DB</span>
           <div>
             <strong>Befehlsvordruck</strong>
-            <small>Ril 408.2411 V01 · Stand 14.12.2025</small>
+            <small>gemäß Ril 408.2411 V01 · gültig ab 14.12.2025</small>
           </div>
         </div>
         <div class="vordruck-kennung">
           <span>Z · Eindeutige Kennung</span>
-          <strong>${e(kennung)}</strong>
+          <strong>${e(state.current.kennung)}</strong>
         </div>
       </header>
 
@@ -896,19 +956,17 @@ function orderForm(command) {
         ${vordruckField("W", "Name Anweisender", state.profile?.discord_username || "")}
         ${vordruckField("B", "Datum", datum)}
         ${vordruckField("Y", "Uhrzeit", scenario.time)}
+        ${vordruckField("Z", "Übertrag / eindeutige Kennung", state.current.kennung, true)}
       </div>
 
-      <div class="vordruck-reason">
-        <span class="vordruck-label">Grund-Nr. / Anlass</span>
-        <span class="vordruck-reason-text">${e(command.description)}</span>
-        <span class="vordruck-label">Befehl</span>
-        <strong>${e(command.nr)} – ${e(command.title)}</strong>
+      <div class="vordruck-toolbar">
+        <span>Befehl ankreuzen · Angaben auf den Linien eintragen · nicht zutreffende Zeilen durchstreichen.</span>
+        <span class="vordruck-strike-count">${struckCount} Zeile${struckCount === 1 ? "" : "n"} durchgestrichen</span>
+        <button type="button" class="link-btn" data-action="strike-others">Alle anderen durchstreichen</button>
       </div>
 
-      <div class="vordruck-body">
-        <div class="vordruck-clauses">${fields.join("")}</div>
-        ${measures}
-      </div>
+      ${vordruckSection("Befehle 1 – 9", "Vorderseite · standardisierte Befehle (TSI OPE)", vorne)}
+      ${vordruckSection("Befehle 21 – 95", "Rückseite · nationale Befehle der DB", hinten)}
 
       <footer class="vordruck-foot">
         <div class="vordruck-sign">
@@ -943,22 +1001,8 @@ function orderPanel(scenario) {
     </div>
     <span class="step-chip">${state.index + 1}<span>/${state.queue.length}</span></span>
   </div>
-  <p class="order-hint">Wähle den Befehl und fülle den Vordruck aus. Nach dem Absenden wird jede Angabe einzeln bewertet.</p>
-  <div class="vordruck-picker">
-    <div class="vordruck-picker-head">
-      <span>Befehlsauswahl</span>
-      <small>Befehl 1–9 sowie nationale Befehle</small>
-    </div>
-    ${commandGrid(selected)}
-  </div>
-  ${
-    command
-      ? orderForm(command)
-      : `<div class="empty-command">
-          <div class="empty-icon">?</div>
-          <p><strong>Noch kein Befehl gewählt.</strong><br>Wähle oben den Befehl, der zu dieser Situation passt.</p>
-        </div>`
-  }`;
+  <p class="order-hint">Kreuze den passenden Befehl im Vordruck an, trage die Angaben auf den Linien ein und streiche die nicht zutreffenden Zeilen durch.</p>
+  ${orderForm(command)}`;
 }
 
 function trainScreen() {
@@ -2117,7 +2161,7 @@ function startTraining() {
   state.queue = queue;
   state.index = 0;
   state.answers = [];
-  state.current = { command: null, fields: {}, measures: {} };
+  state.current = { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" };
   state.startedAt = Date.now();
   state.endedAt = null;
   state.screen = "train";
@@ -2132,7 +2176,7 @@ function nextSituation() {
     return;
   }
   state.index += 1;
-  state.current = { command: null, fields: {}, measures: {} };
+  state.current = { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" };
   state.screen = "train";
   render();
 }
@@ -2333,6 +2377,21 @@ app.addEventListener("click", async (event) => {
       state.current.command = null;
       state.current.fields = {};
       state.current.measures = {};
+      state.current.struck = {};
+      state.current.note = "";
+      refreshOrderPanel();
+    }
+    if (action === "strike-row") {
+      const nr = actionEl.dataset.row;
+      state.current.struck = state.current.struck || {};
+      state.current.struck[nr] = !vordruckStruck(nr);
+      refreshOrderPanel();
+    }
+    if (action === "strike-others") {
+      state.current.struck = {};
+      COMMANDS.forEach((cmd) => {
+        if (cmd.nr !== state.current.command) state.current.struck[cmd.nr] = true;
+      });
       refreshOrderPanel();
     }
     if (action === "logout") await signOut();
@@ -2350,11 +2409,14 @@ app.addEventListener("click", async (event) => {
 
   const commandButton = event.target.closest("[data-command]");
   if (commandButton) {
+    if (event.target.closest(".vrow-fill")) return;
     const nr = commandButton.dataset.command;
     if (state.current.command !== nr) {
       state.current.command = nr;
       state.current.fields = {};
       state.current.measures = {};
+      state.current.struck = {};
+      state.current.note = "";
     }
     refreshOrderPanel();
     if (window.innerWidth < 900) {
@@ -2396,6 +2458,11 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  const note = event.target.closest("[data-note]");
+  if (note) {
+    state.current.note = note.value;
+    return;
+  }
   if (!event.target.closest("#scenario-form")) return;
   const draft = collectScenarioDraft();
   if (draft) {

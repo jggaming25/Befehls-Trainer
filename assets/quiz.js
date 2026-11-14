@@ -118,9 +118,23 @@ function quizDeadlineText(value) {
   return `noch ${Math.max(1, hours)} Std. (${formatDate(value)})`;
 }
 
+function quizPassDecided(attempt) {
+  return Boolean(attempt && attempt.status === "graded" && typeof attempt.passed === "boolean");
+}
+
 function quizPassed(attempt) {
-  if (!attempt || attempt.status !== "graded") return false;
-  return quizNum(attempt.percentage) >= quizNum(quizState.settings?.pass_percent ?? 60);
+  return Boolean(attempt && attempt.status === "graded" && attempt.passed === true);
+}
+
+function quizPassRecommendation(attempt) {
+  const threshold = quizNum(quizState.settings?.pass_percent ?? 60);
+  return quizNum(attempt?.percentage) >= threshold;
+}
+
+function quizPassLabel(attempt) {
+  if (!attempt || attempt.status !== "graded") return "Entscheidung offen";
+  if (!quizPassDecided(attempt)) return "Entscheidung offen";
+  return attempt.passed ? "bestanden" : "nicht bestanden";
 }
 
 function quizQuestionSeconds(question, settings = quizState.settings) {
@@ -433,7 +447,7 @@ function quizLandingScreen() {
         </p>
         <dl class="quiz-facts">
           <div><dt>Fragen</dt><dd>${quizState.publicQuestions.length}</dd></div>
-          <div><dt>Bestehensgrenze</dt><dd>${quizNum(settings.pass_percent)} %</dd></div>
+          <div><dt>Empfehlung</dt><dd>${quizNum(settings.pass_percent)} %</dd></div>
           <div><dt>Zeit</dt><dd>${settings.total_minutes ? `${quizNum(settings.total_minutes)} Min.` : `ca. ${suggested} Min.`}</dd></div>
           <div><dt>Aufbewahrung</dt><dd>${quizNum(settings.retention_weeks)} Wochen</dd></div>
         </dl>
@@ -458,7 +472,7 @@ function quizLandingScreen() {
         <div class="quiz-kpis">
           <div><span>Beste Wertung</span><strong>${best ? `${quizFmt(best)} %` : "—"}</strong></div>
           <div><span>Letzte Wertung</span><strong>${last ? `${quizFmt(last.percentage)} %` : "—"}</strong></div>
-          <div><span>Bestanden</span><strong>${passed ? "Ja" : "Nein"}</strong></div>
+          <div><span>Bestanden</span><strong>${passed ? "Ja" : last && quizPassDecided(last) ? "Nein" : "Offen"}</strong></div>
         </div>
         ${last ? `<p class="quiz-hint">Bewertet von <strong>${e(last.graded_by_name || "—")}</strong> am ${e(quizFormatDate(last.graded_at))}.</p>` : ""}
         <button class="btn btn-ghost btn-sm" type="button" data-quiz-action="reload">Aktualisieren</button>
@@ -486,7 +500,7 @@ function quizLandingScreen() {
                   <span>${e(quizFormatDate(a.started_at))}</span>
                   <span>${quizStatusPill(a.status)}${a.flag ? `<small class="flag-note">${e(QUIZ_FLAG_LABELS[a.flag] || a.flag)}</small>` : ""}</span>
                   <span>${a.status === "graded" || a.status === "submitted" ? `${quizFmt(a.total_points)} / ${quizFmt(a.max_points)}` : "—"}</span>
-                  <span>${a.percentage == null ? "—" : `${quizFmt(a.percentage)} %`}${a.status === "graded" ? (quizPassed(a) ? ` <span class="status-pill ok">bestanden</span>` : ` <span class="status-pill bad">nicht bestanden</span>`) : ""}</span>
+                  <span>${a.percentage == null ? "—" : `${quizFmt(a.percentage)} %`}${a.status === "graded" ? (quizPassDecided(a) ? (a.passed ? ` <span class="status-pill ok">bestanden</span>` : ` <span class="status-pill bad">nicht bestanden</span>`) : ` <span class="status-pill wait">Entscheidung offen</span>`) : ""}</span>
                   <span>${e(a.graded_by_name || "—")}</span>
                   <span class="admin-row-actions">
                     ${
@@ -1082,7 +1096,10 @@ function quizResultScreen() {
 
   const graded = attempt.status === "graded";
   const review = Array.isArray(attempt.review) ? attempt.review : [];
+  const decided = quizPassDecided(attempt);
   const passed = quizPassed(attempt);
+  const recommendation = quizPassRecommendation(attempt);
+  const threshold = quizNum(quizState.settings?.pass_percent ?? 60);
   const profile = state.profile || {};
   const remaining = Math.max(0, 1 + quizNum(profile.extra_attempts) - quizState.attempts.length);
 
@@ -1091,7 +1108,7 @@ function quizResultScreen() {
     <header class="page-head">
       <div>
         <p class="eyebrow">Auswertung · ${e(quizFormatDate(attempt.started_at))}</p>
-        <h1>${graded ? (passed ? "Bestanden" : "Nicht bestanden") : "Abgegeben – Bewertung offen"}</h1>
+        <h1>${graded ? (decided ? (passed ? "Bestanden" : "Nicht bestanden") : "Ergebnis – Entscheidung offen") : "Abgegeben – Bewertung offen"}</h1>
         <p class="page-lead">${quizStatusPill(attempt.status)} ${attempt.flag ? `<span class="status-pill bad">${e(QUIZ_FLAG_LABELS[attempt.flag] || attempt.flag)}</span>` : ""}</p>
       </div>
       <div class="page-actions">
@@ -1117,6 +1134,8 @@ function quizResultScreen() {
         <div class="quiz-score-meta">
           <div><span>Punkte</span><strong>${quizFmt(attempt.total_points)} / ${quizFmt(attempt.max_points)}</strong></div>
           <div><span>Ergebnis</span><strong>${attempt.percentage == null ? "—" : `${quizFmt(attempt.percentage)} %`}</strong></div>
+          <div><span>Empfehlung</span><strong>${threshold} % · ${recommendation ? "erreicht" : "nicht erreicht"}</strong></div>
+          <div><span>Entscheidung</span><strong>${decided ? (passed ? "Bestanden" : "Nicht bestanden") : graded ? "offen (Admin)" : "—"}</strong></div>
           <div><span>Bewertet von</span><strong>${e(attempt.graded_by_name || (graded ? "—" : "wartet auf Admin"))}</strong></div>
           <div><span>Bewertet am</span><strong>${e(quizFormatDate(attempt.graded_at))}</strong></div>
         </div>
