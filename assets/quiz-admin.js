@@ -403,6 +403,12 @@ function quizCollectQuestionDraft() {
       measurePoints[input.dataset.qmeasureExpected] = { correct: Boolean(input.checked), points: 0 };
     });
     draft.scenario.measure_points = measurePoints;
+
+    if (typeof buildOrderData === "function") {
+      const orderScenario = { ...draft.scenario, command: draft.command_nr };
+      buildOrderData(orderScenario);
+      if (orderScenario.order) draft.scenario.order = orderScenario.order;
+    }
   }
   quizState.admin.questionDraft = draft;
   return draft;
@@ -636,7 +642,8 @@ function quizExpectedBlock(item) {
   if (!command) return "";
   const fields = Object.entries(scenario.field_points || {});
   const measures = Object.entries(scenario.measure_points || {}).filter(([, value]) => value.correct);
-  if (!fields.length && !measures.length) return "";
+  const header = scenario.order && scenario.order.header ? scenario.order.header : null;
+  if (!fields.length && !measures.length && !header) return "";
   return `
     <div class="quiz-expected">
       <span class="field-label">Erwartete Lösung</span>
@@ -653,6 +660,14 @@ function quizExpectedBlock(item) {
             return `<div><span>Maßnahme</span><strong>${e(measure ? measure.label : id)}</strong></div>`;
           })
           .join("")}
+        ${
+          header
+            ? ORDER_HEADER_FIELDS.map(
+                (field) =>
+                  `<div><span>${e(field.id)} ${e(field.label)}</span><strong>${e(header[field.id] || "—")}</strong></div>`
+              ).join("")
+            : ""
+        }
       </div>
     </div>`;
 }
@@ -705,6 +720,18 @@ function quizAdminGradingEditor() {
                   ? `<span class="status-pill ${item.auto_points >= item.points ? "ok" : "bad"}">
                       automatisch ${quizFmt(item.auto_points)} / ${quizFmt(item.points)} P
                     </span>`
+                  : item.type === "command"
+                  ? `<div class="grading-auto">
+                      <span class="status-pill ${quizNum(item.auto_points) >= quizNum(item.auto_max) ? "ok" : "bad"}">
+                        automatisch ${quizFmt(item.auto_points)} / ${quizFmt(item.auto_max)} P
+                      </span>
+                      <span class="panel-hint">Manuell bis ${quizFmt(item.manual_max || item.points)} P.</span>
+                    </div>
+                    <label class="field field-inline">
+                      <span class="field-label">Manuelle Punkte (max. ${quizFmt(item.manual_max || item.points)})</span>
+                      <input data-grade="${e(item.id)}" type="number" min="0" max="${quizNum(item.manual_max || item.points)}" step="0.5"
+                        value="${item.manual_points == null ? "" : quizNum(item.manual_points)}" placeholder="0" />
+                    </label>`
                   : `<label class="field field-inline">
                       <span class="field-label">Punkte (max. ${quizFmt(item.points)})</span>
                       <input data-grade="${e(item.id)}" type="number" min="0" max="${quizNum(item.points)}" step="0.5"
@@ -923,7 +950,9 @@ function quizExportDetails() {
   attempts.forEach((attempt) => {
     (Array.isArray(attempt.review) ? attempt.review : []).forEach((item) => {
       const points =
-        item.auto_points != null
+        item.type === "command"
+          ? quizNum(item.auto_points) + quizNum(item.manual_points)
+          : item.auto_points != null
           ? quizNum(item.auto_points)
           : item.manual_points != null
           ? quizNum(item.manual_points)

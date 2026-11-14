@@ -53,6 +53,8 @@ const quizState = {
   warningVisible: false,
   warnings: 0,
   finishing: false,
+  integrityOpen: false,
+  integrityAck: false,
   orphanHandled: null,
   channel: null,
   tabId: Math.random().toString(36).slice(2),
@@ -515,6 +517,31 @@ function quizLandingScreen() {
             </div>`
       }
     </section>
+    ${
+      quizState.integrityOpen
+        ? `
+    <div class="quiz-gate" role="dialog" aria-modal="true">
+      <div class="quiz-gate-card card">
+        <h2>Hinweis vor Prüfungsbeginn</h2>
+        <p>
+          Der Versuch wird automatisch ausgewertet und von einem Admin geprüft. Ein Betrugsversuch,
+          die Nutzung von KI, Hilfsmitteln oder das Verlassen des Prüfungsbereichs kann zur
+          Annullierung des Versuchs und zu disziplinarischen Maßnahmen führen. Bitte arbeite
+          ausschließlich selbstständig.
+        </p>
+        <label class="check">
+          <input type="checkbox" data-quiz-integrity ${quizState.integrityAck ? "checked" : ""} />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text">Ich habe den Hinweis gelesen und arbeite selbstständig.</span>
+        </label>
+        <div class="quiz-start-actions">
+          <button class="btn btn-primary" type="button" data-quiz-action="start-confirm" ${quizState.integrityAck ? "" : "disabled"}>Prüfung starten</button>
+          <button class="btn btn-ghost" type="button" data-quiz-action="start-cancel">Abbrechen</button>
+        </div>
+      </div>
+    </div>`
+        : ""
+    }
   </section>`;
 }
 
@@ -565,6 +592,8 @@ function quizQuestionBody(question) {
     const selected = draft.command || "";
     const command = selected ? getCommand(selected) : null;
     const scenario = question.scenario || {};
+    const orderScenario = { ...scenario, command: question.command_nr || scenario.command };
+    const order = typeof buildOrderData === "function" ? buildOrderData(orderScenario) : null;
     return `
       <div class="quiz-scenario">
         ${scenario.title ? `<h3>${e(scenario.title)}</h3>` : ""}
@@ -577,6 +606,7 @@ function quizQuestionBody(question) {
         ${scenario.situation ? `<p class="situation-text">${e(scenario.situation)}</p>` : ""}
         ${scenario.task ? `<div class="task-box"><span class="task-label">Auftrag</span><p>${e(scenario.task)}</p></div>` : ""}
         ${Array.isArray(scenario.facts) && scenario.facts.length ? `<div class="fact-chips">${scenario.facts.map((f) => `<span class="mini-chip">${e(f)}</span>`).join("")}</div>` : ""}
+        ${typeof radioTranscript === "function" ? radioTranscript(orderScenario) : ""}
       </div>
 
       <div class="quiz-command-picker">
@@ -636,6 +666,20 @@ function quizQuestionBody(question) {
                     </fieldset>`
                   : ""
               }
+              <div class="quiz-order-header">
+                <p class="field-label">Kopfzeile des Vordrucks</p>
+                <p class="quiz-hint">Alle Angaben stehen in der GSM-R-Anweisung des Fahrdienstleiters.</p>
+                <div class="quiz-header-grid">
+                  ${ORDER_HEADER_FIELDS.map(
+                    (field) => `
+                    <label class="field">
+                      <span class="field-label">${e(field.id)} – ${e(field.label)}</span>
+                      <input class="quiz-header-input" data-quiz-header="${e(field.id)}"
+                        value="${e(draft.header?.[field.id] || "")}" placeholder="${e(field.placeholder)}" autocomplete="off" />
+                    </label>`
+                  ).join("")}
+                </div>
+              </div>
             </div>`
           : `<p class="quiz-hint">Wähle zuerst den Befehl aus. Danach erscheinen die Felder des Vordrucks.</p>`
       }`;
@@ -913,7 +957,7 @@ async function startQuiz() {
     return;
   }
   try {
-    const { data, error } = await sb.rpc("start_quiz_attempt");
+    const { data, error } = await sb.rpc("start_quiz_attempt", { p_integrity_ack: true });
     if (error) throw error;
     const attempt = data?.attempt;
     if (!attempt) throw new Error("Kein Versuch erhalten.");
@@ -1055,6 +1099,10 @@ function quizAnswerLines(item) {
                 .join("")
             : ""
         }
+        ${ORDER_HEADER_FIELDS.map(
+          (field) => `
+        <div class="review-line"><span>${e(field.id)} ${e(field.label)}</span><strong>${e(answer.header?.[field.id] || "—")}</strong></div>`
+        ).join("")}
       </div>`;
   }
 
@@ -1062,8 +1110,15 @@ function quizAnswerLines(item) {
 }
 
 function quizReviewItem(item, graded) {
-  const points =
-    item.auto_points != null ? quizNum(item.auto_points) : item.manual_points != null ? quizNum(item.manual_points) : null;
+  const earned =
+    item.type === "command"
+      ? quizNum(item.auto_points) + quizNum(item.manual_points)
+      : item.auto_points != null
+      ? quizNum(item.auto_points)
+      : item.manual_points != null
+      ? quizNum(item.manual_points)
+      : null;
+  const points = graded || item.type === "command" ? earned : null;
   const max = quizNum(item.points);
   const pending = points == null;
   return `
@@ -1330,7 +1385,12 @@ function quizBindEvents() {
       const current = quizState.answers[question.id];
       const draft = current && typeof current === "object" && !Array.isArray(current) ? current : {};
       if (draft.command !== nr) {
-        quizState.answers[question.id] = { command: nr, fields: {}, measures: {} };
+        quizState.answers[question.id] = {
+          command: nr,
+          fields: {},
+          measures: {},
+          header: draft.header || {},
+        };
         quizMarkDirty(question.id);
       }
       render({ preserveScroll: true });
@@ -1342,7 +1402,24 @@ function quizBindEvents() {
     const action = actionEl.dataset.quizAction;
 
     if (action === "start") {
+      quizState.integrityOpen = true;
+      quizState.integrityAck = false;
+      render();
+      return;
+    }
+    if (action === "start-confirm") {
+      if (!quizState.integrityAck) {
+        showToast("Bitte bestätige den Hinweis.");
+        return;
+      }
+      quizState.integrityOpen = false;
       startQuiz();
+      return;
+    }
+    if (action === "start-cancel") {
+      quizState.integrityOpen = false;
+      quizState.integrityAck = false;
+      render();
       return;
     }
     if (action === "reload") {
@@ -1421,6 +1498,14 @@ function quizBindEvents() {
   });
 
   app.addEventListener("change", (event) => {
+    const integrity = event.target.closest("[data-quiz-integrity]");
+    if (integrity) {
+      quizState.integrityAck = Boolean(integrity.checked);
+      const button = document.querySelector('[data-quiz-action="start-confirm"]');
+      if (button) button.disabled = !quizState.integrityAck;
+      return;
+    }
+
     const option = event.target.closest("[data-quiz-option]");
     if (option) {
       const question = quizCurrentQuestion();
@@ -1455,10 +1540,34 @@ function quizBindEvents() {
       draft.measures = { ...(draft.measures || {}), [measure.dataset.quizMeasure]: measure.checked };
       quizState.answers[question.id] = draft;
       quizMarkDirty(question.id);
+      return;
+    }
+
+    const headerInput = event.target.closest("[data-quiz-header]");
+    if (headerInput) {
+      const question = quizCurrentQuestion();
+      if (!question) return;
+      const current = quizState.answers[question.id];
+      const draft = current && typeof current === "object" && !Array.isArray(current) ? current : {};
+      draft.header = { ...(draft.header || {}), [headerInput.dataset.quizHeader]: headerInput.value };
+      quizState.answers[question.id] = draft;
+      quizMarkDirty(question.id);
+      return;
     }
   });
 
   app.addEventListener("input", (event) => {
+    const headerInput = event.target.closest("[data-quiz-header]");
+    if (headerInput) {
+      const question = quizCurrentQuestion();
+      if (!question) return;
+      const current = quizState.answers[question.id];
+      const draft = current && typeof current === "object" && !Array.isArray(current) ? current : {};
+      draft.header = { ...(draft.header || {}), [headerInput.dataset.quizHeader]: headerInput.value };
+      quizState.answers[question.id] = draft;
+      quizMarkDirty(question.id);
+      return;
+    }
     const text = event.target.closest("[data-quiz-text]");
     if (!text) return;
     const question = quizCurrentQuestion();

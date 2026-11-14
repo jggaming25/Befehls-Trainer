@@ -21,7 +21,9 @@ Eingabefelder und Situationen in Supabase anlegen.
 - **Generierte Situationen** für alle Befehle, inklusive Zugfunk und
   Streckenbild-Presets
 - **Offizieller Befehlsvordruck** nach Muster Ril 408.2411 V01 (Stand 14.12.2025)
-  mit Kennung, Feldern A–Y und Zusatzmaßnahmen
+  mit Kopfzeile A, B, C, D, E, V, W, Y, Z, Feldern und Zusatzmaßnahmen
+- **GSM-R-Zugfunk** mit Tf-Meldung, Fdl-Anweisung und Rücklesen; der Vordruck
+  wird vollständig vom Lernenden ausgefüllt und automatisch geprüft
 - **Betriebsregelwerk-Tab:** bettet das freigegebene Google-Dokument ein, immer
   in der aktuellen Fassung und ohne die Seite zu verlassen
 - **Quiz/Prüfung** zum Betriebsregelwerk: Multiple Choice (automatisch),

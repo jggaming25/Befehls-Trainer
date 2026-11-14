@@ -36,7 +36,7 @@ const state = {
   queue: [],
   index: 0,
   answers: [],
-  current: { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" },
+  current: { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" },
   startedAt: null,
   endedAt: null,
   admin: {
@@ -358,13 +358,15 @@ function evaluate(scenario, answer) {
     ok: cmdOk,
     points: cmdOk ? 4 : 0,
     max: 4,
+    note: "Der zutreffende Befehl wird aus der Lage und dem GSM-R-Zugfunk ermittelt.",
   });
   if (cmdOk) points += 4;
 
-  Object.entries(scenario.fieldPoints || {}).forEach(([id, target]) => {
+  const fieldPoints = scenario.fieldPoints || scenario.field_points || {};
+  Object.entries(fieldPoints).forEach(([id, target]) => {
     const field = correctCommand.fields.find((f) => f.id === id);
     const given = answer.fields[id] || "";
-    const ok = cmdOk && given === target.correct;
+    const ok = cmdOk && orderValueMatches(given, target.correct);
     if (ok) points += target.points;
     criteria.push({
       group: "Angaben",
@@ -375,13 +377,17 @@ function evaluate(scenario, answer) {
       skipped: !cmdOk,
       points: ok ? target.points : 0,
       max: target.points,
+      note: field ? `Angabe aus der Fdl-Anweisung für ${field.label}.` : "",
     });
   });
 
   let measureEarned = 0;
   let measurePenalty = 0;
   correctCommand.measures.forEach((measure) => {
-    const target = (scenario.measurePoints || {})[measure.id] || { correct: false, points: 0 };
+    const target = (scenario.measurePoints || scenario.measure_points || {})[measure.id] || {
+      correct: false,
+      points: 0,
+    };
     const checked = Boolean(answer.measures[measure.id]);
     const ok = cmdOk && checked === Boolean(target.correct);
     if (cmdOk && target.correct && checked) measureEarned += target.points;
@@ -396,6 +402,7 @@ function evaluate(scenario, answer) {
       points: ok && target.correct ? target.points : 0,
       penalty: cmdOk && !target.correct && checked ? 1 : 0,
       max: target.correct ? target.points : 0,
+      note: "Zusatzmaßnahmen dürfen nur angekreuzt werden, wenn sie angeordnet sind.",
     });
   });
 
@@ -403,11 +410,29 @@ function evaluate(scenario, answer) {
     points += Math.max(0, measureEarned - measurePenalty);
   }
 
+  const order = typeof buildOrderData === "function" ? buildOrderData(scenario) : null;
+  let headerOk = true;
+  if (order) {
+    const headerResult = orderHeaderChecks(order, answer.header || {});
+    headerOk = headerResult.ok;
+    criteria.push(...headerResult.checks);
+  }
+
+  let strikesOk = true;
+  if (order) {
+    const strikeResult = orderStrikeChecks(order, answer.struck || {});
+    strikesOk = strikeResult.ok;
+    criteria.push(...strikeResult.checks);
+  }
+
   return {
     points: Math.min(10, points),
     max: 10,
     cmdOk,
     measurePenalty,
+    headerOk,
+    strikesOk,
+    formOk: headerOk && strikesOk,
     criteria,
   };
 }
@@ -737,13 +762,18 @@ function situationFacts(scenario) {
 }
 
 function radioTranscript(scenario) {
-  const messages = Array.isArray(scenario.radio) ? scenario.radio : [];
+  const order = typeof buildOrderData === "function" ? buildOrderData(scenario) : null;
+  const messages = order && Array.isArray(order.radio) && order.radio.length
+    ? order.radio
+    : Array.isArray(scenario?.radio)
+    ? scenario.radio
+    : [];
   if (!messages.length) return "";
   return `
   <div class="radio-box">
     <div class="radio-head">
       <span class="radio-icon" aria-hidden="true">📻</span>
-      <span>Zugfunk</span>
+      <span>GSM-R-Zugfunk</span>
       <span class="radio-channel">Kanal 1 · Rangierfunk</span>
     </div>
     ${messages
@@ -791,6 +821,7 @@ function situationCard(scenario) {
 const VORDRUCK_VORNE = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 function vordruckSectionOf(nr) {
+  if (typeof orderSectionOf === "function") return orderSectionOf(nr);
   return VORDRUCK_VORNE.includes(String(nr)) ? "vorne" : "hinten";
 }
 
@@ -798,7 +829,7 @@ function vordruckStruck(nr) {
   const override = state.current.struck ? state.current.struck[nr] : undefined;
   if (override === true) return true;
   if (override === false) return false;
-  return Boolean(state.current.command) && state.current.command !== nr;
+  return false;
 }
 
 function vordruckFieldControl(cmd, field, index) {
@@ -881,36 +912,35 @@ function vordruckRow(cmd) {
   </div>`;
 }
 
-function vordruckSection(title, subtitle, commands) {
+function vordruckSection(title, subtitle, commands, pageLabel, inactive = false) {
   if (!commands.length) return "";
   return `
-  <section class="vordruck-seite">
+  <section class="vordruck-seite ${inactive ? "is-inactive" : ""}">
     <header class="vordruck-seite-head">
       <div>
         <strong>${e(title)}</strong>
         <span>${e(subtitle)}</span>
       </div>
+      <span>${e(pageLabel || "")}</span>
     </header>
+    ${inactive ? `<p class="vordruck-page-note">Diese Seite ist nicht Bestandteil des Vordrucks.</p>` : ""}
     <div class="vrow-list">${commands.map(vordruckRow).join("")}</div>
   </section>`;
 }
 
 function orderForm(command) {
   const scenario = state.queue[state.index] || {};
-  if (!state.current.kennung) state.current.kennung = `BT-${String(Date.now()).slice(-6)}`;
-  const datum = new Date().toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  const order = typeof buildOrderData === "function" ? buildOrderData(scenario) : null;
+  const header = state.current.header || {};
 
-  const vordruckField = (code, label, value, wide = false) => `
-    <div class="vordruck-cell${wide ? " vordruck-cell-wide" : ""}">
-      <span class="vordruck-code">${e(code)}</span>
-      <span class="vordruck-cell-label">${e(label)}</span>
-      <strong class="vordruck-cell-value">${e(value || "—")}</strong>
+  const vordruckHeaderCell = (field) => `
+    <div class="vordruck-cell${field.id === "Z" ? " vordruck-cell-wide" : ""}" title="${e(field.hint)}">
+      <span class="vordruck-code">${e(field.id)}</span>
+      <span class="vordruck-cell-label">${e(field.label)}</span>
+      <input class="vordruck-input" data-header="${e(field.id)}" value="${e(header[field.id] || "")}"
+        placeholder="${e(field.placeholder)}" autocomplete="off" spellcheck="false" />
+      <span class="vordruck-cell-hint">${e(field.hint)}</span>
     </div>`;
-
   const vorne = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "vorne");
   const hinten = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "hinten");
   const struckCount = COMMANDS.filter((cmd) => vordruckStruck(cmd.nr)).length;
@@ -943,30 +973,42 @@ function orderForm(command) {
         </div>
         <div class="vordruck-kennung">
           <span>Z · Eindeutige Kennung</span>
-          <strong>${e(state.current.kennung)}</strong>
+          <strong>${e((order && order.header && order.header.Z) || "")}</strong>
         </div>
       </header>
-
+ 
       <div class="vordruck-grid">
-        ${vordruckField("A", "Zugnummer", scenario.train)}
-        ${vordruckField("C", "Standort des Zuges", scenario.subtitle)}
-        ${vordruckField("D", "Standort des Anweisenden", "Fdl " + (state.profile?.discord_username || ""))}
-        ${vordruckField("E", "Anzahl der Vordrucke", "1")}
-        ${vordruckField("V", "Name Tf", "Tf im Zugfunk")}
-        ${vordruckField("W", "Name Anweisender", state.profile?.discord_username || "")}
-        ${vordruckField("B", "Datum", datum)}
-        ${vordruckField("Y", "Uhrzeit", scenario.time)}
-        ${vordruckField("Z", "Übertrag / eindeutige Kennung", state.current.kennung, true)}
+        ${ORDER_HEADER_FIELDS.map(vordruckHeaderCell).join("")}
       </div>
-
+ 
       <div class="vordruck-toolbar">
-        <span>Befehl ankreuzen · Angaben auf den Linien eintragen · nicht zutreffende Zeilen durchstreichen.</span>
+        <span>Befehl ankreuzen · Kopfzeile ausfüllen · nicht zutreffende Zeilen durchstreichen.</span>
         <span class="vordruck-strike-count">${struckCount} Zeile${struckCount === 1 ? "" : "n"} durchgestrichen</span>
         <button type="button" class="link-btn" data-action="strike-others">Alle anderen durchstreichen</button>
       </div>
-
-      ${vordruckSection("Befehle 1 – 9", "Vorderseite · standardisierte Befehle (TSI OPE)", vorne)}
-      ${vordruckSection("Befehle 21 – 95", "Rückseite · nationale Befehle der DB", hinten)}
+ 
+      ${vordruckSection(
+        "Befehle 1 – 9",
+        "Vorderseite · standardisierte Befehle (TSI OPE)",
+        vorne,
+        !state.current.command
+          ? "Seite 1 von 2"
+          : vordruckSectionOf(command.nr) === "vorne"
+          ? "Seite 1 von 1"
+          : "nicht Bestandteil",
+        Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "vorne"
+      )}
+      ${vordruckSection(
+        "Befehle 21 – 95",
+        "Rückseite · nationale Befehle der DB",
+        hinten,
+        !state.current.command
+          ? "Seite 2 von 2"
+          : vordruckSectionOf(command.nr) === "hinten"
+          ? "Seite 1 von 1"
+          : "nicht Bestandteil",
+        Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "hinten"
+      )}
 
       <footer class="vordruck-foot">
         <div class="vordruck-sign">
@@ -1028,7 +1070,11 @@ function criteriaGroup(group, criteria) {
   <section class="criteria-group">
     <header class="criteria-head">
       <h3>${e(group)}</h3>
-      <span>${Math.max(0, earned)} / ${max} P</span>
+      <span>${
+        max === 0
+          ? `${rows.filter((c) => c.ok).length} / ${rows.length} korrekt`
+          : `${Math.max(0, earned)} / ${max} P`
+      }</span>
     </header>
     ${rows
       .map((c) => {
@@ -1046,10 +1092,11 @@ function criteriaGroup(group, criteria) {
                   ? ""
                   : `<span class="expected">Richtig: <strong>${e(c.expected)}</strong></span>`
               }
+              ${c.note ? `<span class="criterion-note">${e(c.note)}</span>` : ""}
             </span>
           </div>
           <span class="criterion-points ${c.penalty ? "penalty" : ""}">
-            ${c.penalty ? "−1 P" : `${c.points} / ${c.max} P`}
+            ${c.penalty ? "−1 P" : c.max === 0 ? (c.ok ? "✓" : "✕") : `${c.points} / ${c.max} P`}
           </span>
         </div>`;
       })
@@ -1069,6 +1116,13 @@ function solutionSummary(scenario) {
       const measure = cmd.measures.find((m) => m.id === id);
       return `<span class="solution-chip measure"><span>Maßnahme</span><strong>${e(measure ? measure.label : id)}</strong></span>`;
     });
+  const order = typeof buildOrderData === "function" ? buildOrderData(scenario) : null;
+  const headerChips = order
+    ? ORDER_HEADER_FIELDS.map(
+        (field) =>
+          `<span class="solution-chip"><span>${e(field.id)} ${e(field.label)}</span><strong>${e(order.header[field.id] || "—")}</strong></span>`
+      )
+    : [];
   return `
     <div class="solution-box">
       <div class="solution-title">
@@ -1079,6 +1133,7 @@ function solutionSummary(scenario) {
         </div>
       </div>
       <div class="solution-chips">${fields.join("")}${measures.join("")}</div>
+      <div class="solution-chips">${headerChips.join("")}</div>
       <p class="solution-note">„Richtig“ heißt hier: der Befehl löst die geschilderte Lage betrieblich korrekt auf – nicht nur „ein Befehl wurde gewählt“.</p>
     </div>`;
 }
@@ -1120,10 +1175,20 @@ function resultScreen() {
           : ""
       }
 
+      ${
+        !ev.formOk
+          ? `<div class="wrong-banner">
+              <span class="wrong-icon">!</span>
+              <p><strong>Vordruck unvollständig oder fehlerhaft.</strong> Kopfzeile oder Durchstreichungen stimmen nicht. Die Befehlsbewertung bleibt unverändert.</p>
+            </div>`
+          : ""
+      }
       <div class="criteria-list">
         ${criteriaGroup("Befehlswahl", ev.criteria)}
         ${criteriaGroup("Angaben", ev.criteria)}
         ${criteriaGroup("Zusatzmaßnahmen", ev.criteria)}
+        ${criteriaGroup("Kopfzeile", ev.criteria)}
+        ${criteriaGroup("Durchstreichung", ev.criteria)}
       </div>
 
       ${solutionSummary(scenario)}
@@ -1153,6 +1218,7 @@ function summaryScreen() {
   const total = totalPoints();
   const average = total / 10;
   const correctCommands = state.answers.filter((a) => a && a.evaluation.cmdOk).length;
+  const correctForms = state.answers.filter((a) => a && a.evaluation.formOk).length;
   const duration = formatDuration((state.endedAt || Date.now()) - state.startedAt);
 
   return `
@@ -1168,6 +1234,10 @@ function summaryScreen() {
           <div class="stat">
             <span class="stat-label">Richtige Befehle</span>
             <strong>${correctCommands}<span> / ${state.queue.length}</span></strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Vordrucke korrekt</span>
+            <strong>${correctForms}<span> / ${state.queue.length}</span></strong>
           </div>
           <div class="stat">
             <span class="stat-label">Punkte gesamt</span>
@@ -2153,7 +2223,7 @@ function refreshOrderPanel() {
 }
 
 function startTraining() {
-  const queue = buildScenarioQueue(SCENARIOS_PER_RUN, dbScenarios);
+  const queue = enrichOrderQueue(buildScenarioQueue(SCENARIOS_PER_RUN, dbScenarios));
   if (queue.length < 2) {
     showToast("Es sind noch nicht genug Situationen verfügbar.");
     return;
@@ -2161,7 +2231,7 @@ function startTraining() {
   state.queue = queue;
   state.index = 0;
   state.answers = [];
-  state.current = { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" };
+  state.current = { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" };
   state.startedAt = Date.now();
   state.endedAt = null;
   state.screen = "train";
@@ -2176,7 +2246,7 @@ function nextSituation() {
     return;
   }
   state.index += 1;
-  state.current = { command: null, fields: {}, measures: {}, struck: {}, note: "", kennung: "" };
+  state.current = { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" };
   state.screen = "train";
   render();
 }
@@ -2187,10 +2257,17 @@ function submitOrder() {
     showToast("Bitte wähle zuerst einen Befehl aus.");
     return;
   }
+  const missing = orderMissingHeaderFields(state.current.header || {});
+  if (missing.length) {
+    showToast(`Bitte fülle die Kopfzeile vollständig aus: ${missing.map((f) => f.id).join(", ")}.`);
+    return;
+  }
   const answer = {
     command: state.current.command,
     fields: { ...state.current.fields },
     measures: { ...state.current.measures },
+    header: { ...(state.current.header || {}) },
+    struck: { ...(state.current.struck || {}) },
     evaluation: null,
   };
   answer.evaluation = evaluate(scenario, answer);
@@ -2389,8 +2466,11 @@ app.addEventListener("click", async (event) => {
     }
     if (action === "strike-others") {
       state.current.struck = {};
+      const selected = state.current.command;
+      const page = selected ? vordruckSectionOf(selected) : null;
       COMMANDS.forEach((cmd) => {
-        if (cmd.nr !== state.current.command) state.current.struck[cmd.nr] = true;
+        if (page && vordruckSectionOf(cmd.nr) !== page) return;
+        if (cmd.nr !== selected) state.current.struck[cmd.nr] = true;
       });
       refreshOrderPanel();
     }
@@ -2458,6 +2538,12 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  const header = event.target.closest("[data-header]");
+  if (header) {
+    state.current.header = state.current.header || {};
+    state.current.header[header.dataset.header] = header.value;
+    return;
+  }
   const note = event.target.closest("[data-note]");
   if (note) {
     state.current.note = note.value;

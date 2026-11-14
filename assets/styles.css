@@ -3649,7 +3649,7 @@ dialog::backdrop {
   font-size: 34px;
 }
 
-/* Quiz-Übersicht */
+/* Quiz-ï¿½bersicht */
 .quiz-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr);
@@ -3844,7 +3844,7 @@ dialog::backdrop {
   color: var(--amber);
 }
 
-/* Quiz-Durchführung */
+/* Quiz-Durchfï¿½hrung */
 .quiz-run {
   max-width: 1280px;
   margin: 0 auto;
@@ -4888,7 +4888,7 @@ dialog::backdrop {
   flex-wrap: wrap;
 }
 
-/* Responsive Ergänzungen */
+/* Responsive Ergï¿½nzungen */
 @media (max-width: 1080px) {
   .quiz-grid,
   .quiz-result-grid,
@@ -5539,4 +5539,60 @@ dialog::backdrop {
 .vordruck-cell-wide {
   grid-column: 1 / -1;
   border-right: 0;
+}
+
+.vordruck-input {
+  grid-column: 2;
+  grid-row: 2;
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1.4px solid #98a4b3;
+  background: #f7f9fb;
+  padding: 2px 3px;
+  font: inherit;
+  font-size: 10.5px;
+  color: #11161d;
+  border-radius: 2px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.vordruck-input:focus {
+  outline: 2px solid rgba(226, 0, 26, 0.18);
+  border-bottom-color: #e2001a;
+  background: #fff;
+}
+
+.vordruck-cell-hint {
+  grid-column: 2;
+  grid-row: 3;
+  font-size: 7px;
+  line-height: 1.2;
+  color: #a0aab6;
+  margin-top: 1px;
+}
+
+.vordruck-cell {
+  grid-template-rows: auto auto auto;
+}
+
+.criterion-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: #6b7684;
+}
+
+.vordruck-page-note {
+  margin: 0;
+  padding: 6px 11px;
+  font-size: 9px;
+  color: #6b7684;
+  background: #f6f8fa;
+  border-bottom: 1px solid #dce3ea;
+}
+
+.vordruck-seite.is-inactive {
+  opacity: 0.58;
 }
