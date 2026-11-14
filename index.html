@@ -29,6 +29,11 @@
         </div>
 
         <div class="appbar-actions">
+          <nav class="main-nav" id="main-nav" aria-label="Hauptbereiche" hidden>
+            <button class="main-nav-item" type="button" data-nav="start">Training</button>
+            <button class="main-nav-item" type="button" data-nav="rulebook">Betriebsregelwerk</button>
+            <button class="main-nav-item" type="button" data-nav="quiz">Quiz</button>
+          </nav>
           <span class="score-pill" id="header-score" hidden>
             <span class="score-pill-dot"></span><strong>0</strong> P
           </span>
@@ -42,6 +47,8 @@
         </div>
       </div>
     </header>
+
+    <div id="app-alert" class="app-alert" role="status" aria-live="polite" hidden></div>
 
     <main id="app" aria-live="polite"></main>
 
@@ -85,6 +92,30 @@
       </div>
     </dialog>
 
+    <div id="quiz-warning" class="quiz-warning" hidden role="alertdialog" aria-modal="true" aria-labelledby="quiz-warning-title">
+      <div class="quiz-warning-card">
+        <span class="quiz-warning-icon">!</span>
+        <h2 id="quiz-warning-title">Du hast das Quiz verlassen</h2>
+        <p id="quiz-warning-text">
+          Bleib während der Prüfung im Quiz. Nach 35 Sekunden außerhalb wird automatisch abgegeben.
+        </p>
+        <button class="btn btn-primary" type="button" data-quiz-action="dismiss-warning">Zurück zum Quiz</button>
+      </div>
+    </div>
+
+    <dialog id="contact-modal" class="modal modal-small" aria-labelledby="contact-title">
+      <div class="confirm-body">
+        <h2 id="contact-title">Speichern nicht möglich</h2>
+        <p id="contact-text">
+          Deine Daten konnten nicht gespeichert werden. Bitte wende dich an Admin Jann (Discord: jlg09)
+          per DM oder an den DVN-Discord im Staff-Bereich.
+        </p>
+        <div class="confirm-actions">
+          <button class="btn btn-primary" type="button" data-close>Verstanden</button>
+        </div>
+      </div>
+    </dialog>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="assets/config.js"></script>
@@ -93,6 +124,8 @@
     <script src="assets/generator.js"></script>
     <script src="assets/generator2.js"></script>
     <script src="assets/vendor/supabase.js"></script>
+    <script src="assets/quiz.js" defer></script>
+    <script src="assets/quiz-admin.js" defer></script>
     <script src="assets/app.js" defer></script>
   </body>
 </html>

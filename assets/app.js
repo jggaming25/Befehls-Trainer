@@ -17,6 +17,7 @@ const headerUser = document.getElementById("user-chip");
 const adminButton = document.getElementById("admin-button");
 const logoutButton = document.getElementById("logout-button");
 const referenceButton = document.getElementById("reference-button");
+const mainNav = document.getElementById("main-nav");
 const toastEl = document.getElementById("toast");
 const referenceModal = document.getElementById("reference-modal");
 const confirmModal = document.getElementById("confirm-modal");
@@ -258,15 +259,21 @@ async function handleAuth() {
 
   if (state.profile && state.profile.status === "approved") {
     await loadCatalog();
-    if (!["train", "result", "summary", "admin"].includes(state.screen)) {
+    if (typeof ensureQuizData === "function") await ensureQuizData();
+    if (state.profile.must_change_password) {
+      state.screen = "change-password";
+    } else if (!["train", "result", "summary", "admin", "rulebook", "quiz", "quizrun", "quizresult"].includes(state.screen)) {
       state.screen = "start";
     }
     if (state.screen === "admin" && !isAdmin()) state.screen = "start";
+  } else if (state.profile && state.profile.status === "disabled") {
+    state.screen = "disabled";
   } else if (state.profile && state.profile.status === "rejected") {
     state.screen = "rejected";
   } else {
     state.screen = "pending";
   }
+  if (typeof updateQuizAlert === "function") updateQuizAlert();
   render();
 }
 
@@ -316,7 +323,9 @@ async function signUp(discord, roblox, password) {
 }
 
 async function signOut() {
+  if (typeof quizBeforeSignOut === "function") await quizBeforeSignOut();
   if (sb) await sb.auth.signOut();
+  if (typeof resetQuizSession === "function") resetQuizSession();
   state.session = null;
   state.profile = null;
   state.queue = [];
@@ -410,14 +419,27 @@ function updateHeader() {
   const approved = isApproved();
   const inTraining = ["train", "result", "summary"].includes(state.screen);
   const showProgress = inTraining && state.queue.length > 0;
+  const navTarget =
+    state.screen === "rulebook"
+      ? "rulebook"
+      : ["quiz", "quizrun", "quizresult"].includes(state.screen)
+      ? "quiz"
+      : "start";
 
   headerProgress.hidden = !showProgress;
   headerScore.hidden = !showProgress;
   headerEnd.hidden = !inTraining;
-  referenceButton.hidden = !approved || state.screen === "admin";
+  referenceButton.hidden = !approved || !["train", "result"].includes(state.screen);
   adminButton.hidden = !isAdmin() || state.screen === "admin";
   logoutButton.hidden = !state.session;
   headerUser.hidden = !state.profile;
+  if (mainNav) {
+    mainNav.hidden = !approved || state.screen === "admin";
+    mainNav.querySelectorAll("[data-nav]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.nav === navTarget);
+      button.disabled = typeof quizActive === "function" && quizActive() && button.dataset.nav !== "quizrun";
+    });
+  }
 
   if (state.profile) {
     headerUser.textContent = state.profile.discord_username || "Konto";
@@ -442,6 +464,9 @@ function updateHeader() {
   }
 
   headerEnd.textContent = state.screen === "summary" ? "Startseite" : "Beenden";
+
+  if (typeof updateQuizAlert === "function") updateQuizAlert();
+  if (typeof syncQuizClock === "function") syncQuizClock();
 }
 
 /* --------------------------------------------------------------------------
@@ -793,14 +818,18 @@ function fieldControl(field, value) {
 }
 
 function orderForm(command) {
-  const fields = command.fields.map((field) =>
-    fieldControl(field, state.current.fields[field.id] || "")
+  const scenario = state.queue[state.index] || {};
+  const fields = command.fields.map(
+    (field, index) => `
+    <div class="vordruck-clause">
+      <span class="clause-nr">${e(command.nr)}.${index + 1}</span>
+      ${fieldControl(field, state.current.fields[field.id] || "")}
+    </div>`
   );
   const measures = command.measures.length
     ? `
-    <fieldset class="measures">
-      <legend>Zusatzmaßnahmen</legend>
-      <p class="measures-hint">Nur ankreuzen, was der Auftrag tatsächlich verlangt.</p>
+    <fieldset class="vordruck-measures">
+      <legend>Zusatzmaßnahmen / zusätzliche Aufträge</legend>
       ${command.measures
         .map(
           (m) => `
@@ -816,6 +845,19 @@ function orderForm(command) {
     </fieldset>`
     : "";
 
+  const datum = new Date().toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const kennung = `BT-${String(Date.now()).slice(-6)}`;
+  const vordruckField = (code, label, value) => `
+    <div class="vordruck-cell">
+      <span class="vordruck-code">${e(code)}</span>
+      <span class="vordruck-cell-label">${e(label)}</span>
+      <strong class="vordruck-cell-value">${e(value || "—")}</strong>
+    </div>`;
+
   return `
   <div class="selected-command">
     <div class="selected-command-main">
@@ -828,11 +870,59 @@ function orderForm(command) {
     <button type="button" class="link-btn" data-action="clear-command">Anderer Befehl</button>
   </div>
   <p class="command-description">${e(command.description)}</p>
+
   <form id="befehl-form" novalidate>
-    <div class="form-grid ${fields.length === 1 ? "single" : ""}">
-      ${fields.join("")}
-    </div>
-    ${measures}
+    <article class="vordruck" aria-label="Befehlsvordruck Befehl ${e(command.nr)}">
+      <header class="vordruck-head">
+        <div class="vordruck-brand">
+          <span class="vordruck-logo" aria-hidden="true">DB</span>
+          <div>
+            <strong>Befehlsvordruck</strong>
+            <small>Ril 408.2411 V01 · Stand 14.12.2025</small>
+          </div>
+        </div>
+        <div class="vordruck-kennung">
+          <span>Z · Eindeutige Kennung</span>
+          <strong>${e(kennung)}</strong>
+        </div>
+      </header>
+
+      <div class="vordruck-grid">
+        ${vordruckField("A", "Zugnummer", scenario.train)}
+        ${vordruckField("C", "Standort des Zuges", scenario.subtitle)}
+        ${vordruckField("D", "Standort des Anweisenden", "Fdl " + (state.profile?.discord_username || ""))}
+        ${vordruckField("E", "Anzahl der Vordrucke", "1")}
+        ${vordruckField("V", "Name Tf", "Tf im Zugfunk")}
+        ${vordruckField("W", "Name Anweisender", state.profile?.discord_username || "")}
+        ${vordruckField("B", "Datum", datum)}
+        ${vordruckField("Y", "Uhrzeit", scenario.time)}
+      </div>
+
+      <div class="vordruck-reason">
+        <span class="vordruck-label">Grund-Nr. / Anlass</span>
+        <span class="vordruck-reason-text">${e(command.description)}</span>
+        <span class="vordruck-label">Befehl</span>
+        <strong>${e(command.nr)} – ${e(command.title)}</strong>
+      </div>
+
+      <div class="vordruck-body">
+        <div class="vordruck-clauses">${fields.join("")}</div>
+        ${measures}
+      </div>
+
+      <footer class="vordruck-foot">
+        <div class="vordruck-sign">
+          <span>Name Anweisender / Unterschrift</span>
+          <strong>${e(state.profile?.discord_username || "")}</strong>
+        </div>
+        <div class="vordruck-sign">
+          <span>Standortbestätigung Tf</span>
+          <strong>wird im Zugfunk bestätigt</strong>
+        </div>
+        <div class="vordruck-note">Vordruck nach DB-Muster · Übungsbetrieb DVN</div>
+      </footer>
+    </article>
+
     <div class="order-actions">
       <p class="privacy-mini"><span>🔒</span> Auswertung im Browser – ohne Speicherung.</p>
       <button type="submit" class="btn btn-primary btn-lg" data-action="submit">
@@ -853,8 +943,14 @@ function orderPanel(scenario) {
     </div>
     <span class="step-chip">${state.index + 1}<span>/${state.queue.length}</span></span>
   </div>
-  <p class="order-hint">Wähle den Befehl und fülle die Felder aus. Nach dem Absenden wird jede Angabe einzeln bewertet.</p>
-  ${commandGrid(selected)}
+  <p class="order-hint">Wähle den Befehl und fülle den Vordruck aus. Nach dem Absenden wird jede Angabe einzeln bewertet.</p>
+  <div class="vordruck-picker">
+    <div class="vordruck-picker-head">
+      <span>Befehlsauswahl</span>
+      <small>Befehl 1–9 sowie nationale Befehle</small>
+    </div>
+    ${commandGrid(selected)}
+  </div>
   ${
     command
       ? orderForm(command)
@@ -1264,12 +1360,19 @@ function adminScreen() {
       </button>
       <button type="button" class="admin-tab ${section === "commands" ? "active" : ""}" data-admin-tab="commands">Befehle &amp; Felder</button>
       <button type="button" class="admin-tab ${section === "scenarios" ? "active" : ""}" data-admin-tab="scenarios">Situationen</button>
+      <button type="button" class="admin-tab ${section === "quiz-questions" ? "active" : ""}" data-admin-tab="quiz-questions">Quizfragen</button>
+      <button type="button" class="admin-tab ${section === "quiz-grading" ? "active" : ""}" data-admin-tab="quiz-grading">
+        Bewertungen
+      </button>
+      <button type="button" class="admin-tab ${section === "quiz-settings" ? "active" : ""}" data-admin-tab="quiz-settings">Quiz-Einstellungen</button>
+      <button type="button" class="admin-tab ${section === "accounts" ? "active" : ""}" data-admin-tab="accounts">Konten</button>
       <button type="button" class="admin-tab admin-tab-home" data-action="home">Zur Startseite</button>
     </nav>
 
     ${section === "requests" ? adminRequests() : ""}
     ${section === "commands" ? adminCommands() : ""}
     ${section === "scenarios" ? adminScenarios() : ""}
+    ${typeof quizAdminSection === "function" ? quizAdminSection(section) : ""}
   </div>`;
 }
 
@@ -1983,6 +2086,10 @@ function render({ preserveScroll = false } = {}) {
     app.innerHTML = summaryScreen();
   } else if (state.screen === "admin") {
     app.innerHTML = adminScreen();
+  } else if (typeof quizIsScreen === "function" && quizIsScreen(state.screen)) {
+    app.innerHTML = quizScreen();
+  } else if (state.screen === "change-password" || state.screen === "disabled") {
+    app.innerHTML = quizAccountScreen();
   } else {
     app.innerHTML = startScreen();
   }
@@ -2102,6 +2209,7 @@ app.addEventListener("click", async (event) => {
     state.admin.section = adminTab.dataset.adminTab;
     state.admin.commandDraft = null;
     state.admin.scenarioDraft = null;
+    if (typeof quizAdminEnter === "function") quizAdminEnter(state.admin.section);
     render();
     return;
   }
@@ -2443,6 +2551,7 @@ async function init() {
 
   sb.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_OUT") {
+      if (typeof resetQuizSession === "function") resetQuizSession();
       state.session = null;
       state.profile = null;
       state.screen = "auth";
@@ -2460,6 +2569,7 @@ async function init() {
   await fetchBootstrap();
   try {
     await handleAuth();
+    if (typeof initQuiz === "function") await initQuiz();
   } catch (error) {
     console.error(error);
     state.screen = "auth";
