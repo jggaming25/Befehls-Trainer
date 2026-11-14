@@ -4396,6 +4396,26 @@ dialog::backdrop {
   color: var(--muted);
 }
 
+/* Offizieller Befehlsvordruck – Originalbild als Wasserzeichen */
+.vordruck {
+  position: relative;
+}
+.vordruck::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("vordruck-front.png?v=20261114d");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+}
+.vordruck > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Offizieller Befehlsvordruck */
 .vordruck-picker {
   margin: 12px 0 14px;

@@ -985,6 +985,7 @@ function orderForm(command) {
         <span>Befehl ankreuzen · Kopfzeile ausfüllen · nicht zutreffende Zeilen durchstreichen.</span>
         <span class="vordruck-strike-count">${struckCount} Zeile${struckCount === 1 ? "" : "n"} durchgestrichen</span>
         <button type="button" class="link-btn" data-action="strike-others">Alle anderen durchstreichen</button>
+        <button type="button" class="link-btn" data-action="show-vordruck-image">Original-Vordruck anzeigen</button>
       </div>
  
       ${vordruckSection(
@@ -2463,6 +2464,10 @@ app.addEventListener("click", async (event) => {
       state.current.struck = state.current.struck || {};
       state.current.struck[nr] = !vordruckStruck(nr);
       refreshOrderPanel();
+    }
+    if (action === "show-vordruck-image") {
+      window.open("assets/vordruck-front.png", "_blank", "noopener");
+      return;
     }
     if (action === "strike-others") {
       state.current.struck = {};
