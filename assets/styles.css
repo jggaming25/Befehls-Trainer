@@ -4408,7 +4408,7 @@ dialog::backdrop {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center top;
-  opacity: 0.18;
+  opacity: 0.35;
   pointer-events: none;
   z-index: 0;
 }
