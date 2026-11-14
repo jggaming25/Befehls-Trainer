@@ -4405,9 +4405,10 @@ dialog::backdrop {
   position: absolute;
   inset: 0;
   background-image: url("vordruck-front.png?v=20261114d");
-  background-size: 100% 100%;
+  background-size: contain;
   background-repeat: no-repeat;
-  opacity: 0.08;
+  background-position: center top;
+  opacity: 0.18;
   pointer-events: none;
   z-index: 0;
 }
