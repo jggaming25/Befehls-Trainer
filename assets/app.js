@@ -44,6 +44,15 @@ if (mainNav) {
     }
   });
 }
+
+// Guide schließen: Close-Button oder Klick außerhalb
+document.addEventListener("click", (event) => {
+  const guideClose = event.target.closest(".guide-close");
+  if (guideClose) {
+    state.screen = "train";
+    render();
+  }
+});
 const toastEl = document.getElementById("toast");
 const referenceModal = document.getElementById("reference-modal");
 const confirmModal = document.getElementById("confirm-modal");
@@ -1391,6 +1400,7 @@ function guideScreen() {
       </header>
 
       <div class="guide-content">
+        <p class="guide-close-inst">Klicke außerhalb oder auf × zum Schließen</p>
         <h3>1. Vordruck-Kopfzeile (Pflichtfeld)</h3>
         <p>Die Kopfzeile muss vollständig ausgefüllt werden, bevor der Befehl abgeschickt werden kann.</p>
         <table class="guide-table">
