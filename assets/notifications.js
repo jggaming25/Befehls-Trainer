@@ -153,7 +153,11 @@ function notifySyncQuiz(profile) {
     id,
     kind: "quiz",
     tone: overdue ? "danger" : "warning",
-    title: overdue ? "Prüfungsfrist abgelaufen" : "Prüfung bis zur Frist ablegen",
+    title: overdue
+      ? "Prüfungsfrist abgelaufen"
+      : deadline
+      ? "Prüfung bis zur Frist ablegen"
+      : "Quiz-Prüfung erforderlich",
     body: overdue
       ? `Deine Frist${deadline ? ` vom ${notifyDate(profile.quiz_deadline)}` : ""} ist abgelaufen. Bitte lege die Quiz-Prüfung jetzt ab.`
       : deadline

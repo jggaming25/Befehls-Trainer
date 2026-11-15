@@ -1052,8 +1052,9 @@ function quizAccountQuizPill(account) {
 }
 
 function quizDateTimeInputValue(value) {
-  const date = value ? new Date(value) : new Date(Date.now() + 7 * 86400000);
-  if (Number.isNaN(date.getTime())) return quizLocalDateTimeValue(7);
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
@@ -1178,21 +1179,25 @@ function quizAccountDetail(account) {
         <p>
           ${
             account.quiz_required
-              ? `Prüfung angefordert – ${e(quizDeadlineText(account.quiz_deadline))}.`
+              ? account.quiz_deadline
+                ? `Prüfung angefordert – ${e(quizDeadlineText(account.quiz_deadline))}.`
+                : "Prüfung angefordert – ohne Frist."
               : "Aktuell ist keine Prüfung angefordert."
           }
         </p>
         <label class="account-field">
-          <span>Frist</span>
+          <span>Frist (optional)</span>
           <input class="account-deadline" type="datetime-local" data-account-deadline="${e(account.id)}"
-            value="${quizDateTimeInputValue(account.quiz_deadline)}" aria-label="Frist" ${disabledAttr} />
+            value="${quizDateTimeInputValue(account.quiz_deadline)}" aria-label="Frist (optional)" ${disabledAttr} />
         </label>
         <div class="account-presets">
+          <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="0">Keine Frist</button>
           <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="1">+1 Tag</button>
           <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="3">+3 Tage</button>
           <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="7">+7 Tage</button>
           <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="14">+14 Tage</button>
         </div>
+        <p class="panel-hint">Ohne Frist erscheint der Hinweis beim Nutzer ohne Datum.</p>
         <label class="account-field">
           <span>Notiz (optional)</span>
           <input class="account-note" type="text" data-account-note="${e(account.id)}" value="${e(account.quiz_required_note || "")}"
@@ -1476,7 +1481,8 @@ function quizAdminBindEvents() {
     }
     if (action === "deadline-preset") {
       const input = document.querySelector(`[data-account-deadline="${id}"]`);
-      if (input) input.value = quizLocalDateTimeValue(Number(actionEl.dataset.days) || 7);
+      const days = Number(actionEl.dataset.days);
+      if (input) input.value = days > 0 ? quizLocalDateTimeValue(days) : "";
       return;
     }
     if (

@@ -316,12 +316,17 @@ function updateQuizAlert() {
             ? `Die Frist ist am ${e(formatDate(profile.quiz_deadline))} abgelaufen.`
             : `Frist: ${e(quizDeadlineText(profile.quiz_deadline))}.`
           : "Es wurde keine Frist gesetzt.";
+        const request = overdue
+          ? "Bitte lege die Prüfung umgehend ab."
+          : profile.quiz_deadline
+          ? "Bitte lege die Prüfung bis zur Frist ab."
+          : "Bitte lege die Prüfung ab.";
         html = `
           <div class="alert-inner ${overdue ? "alert-danger" : "alert-warn"}">
             <span class="alert-mark">!</span>
             <div class="alert-copy">
-              <strong>${overdue ? "Frist abgelaufen – Prüfung überfällig" : "Quiz-Prüfung bis zur Frist ablegen"}</strong>
-              <span>${when}${note} Bitte lege die Prüfung ${overdue ? "umgehend" : "bis zur Frist"} ab.</span>
+              <strong>${overdue ? "Frist abgelaufen – Prüfung überfällig" : "Quiz-Prüfung erforderlich"}</strong>
+              <span>${when}${note} ${request}</span>
             </div>
             <button class="btn btn-primary btn-sm" type="button" data-nav="quiz">Zum Quiz</button>
           </div>`;

@@ -147,10 +147,11 @@ laufenden Quiz ist der Tab gesperrt.
   markiert. Der Seitentitel zeigt währenddessen „Seite derzeit nicht verfügbar“.
 - **Aufbewahrung:** Auswertungen bleiben 12 Wochen nach der Freigabe sichtbar und
   werden danach datensparsam gelöscht (`prune_quiz_attempts`).
-- **Prüfungspflicht:** Admins können in den Kontodetails eine Prüfung mit Frist
-  und Notiz anfordern. Betroffene sehen bis zur Frist ein gelbes Hinweisbanner,
-  nach Ablauf wird es rot. Zusätzlich erscheinen die Hinweise in der
-  Benachrichtigungsbox (Glocke) und – nach Freigabe – als Desktop-Benachrichtigung.
+- **Prüfungspflicht:** Admins können in den Kontodetails eine Prüfung anfordern –
+  Frist und Notiz sind optional (standardmäßig wird keine Frist gesetzt).
+  Betroffene sehen bis zur Frist ein gelbes Hinweisbanner, nach Ablauf wird es
+  rot. Zusätzlich erscheinen die Hinweise in der Benachrichtigungsbox (Glocke)
+  und – nach Freigabe – als Desktop-Benachrichtigung.
 
 ### Grenzen der Sperre
 
@@ -164,7 +165,8 @@ Vollständiger Schutz ist nur mit einer kontrollierten Prüfungsumgebung möglic
 
 1. Admin → **Konten** → beim gewünschten Konto **Details** öffnen
 2. Dort stehen Zugang (deaktivieren, Passwort zurücksetzen, löschen), Rolle,
-   Prüfungsfrist und Versuche getrennt zur Verfügung
+   Prüfungsfrist und Versuche getrennt zur Verfügung. Die Frist ist optional –
+   ohne Eintrag wird keine Frist gesetzt.
 3. **Zum Admin machen** bzw. **Zum Mitglied machen** ändert die Rolle
 4. **Passwort zurücksetzen** erzeugt einen kopierbaren Text mit Website-Link,
    Discord-Benutzername und Einmalpasswort
