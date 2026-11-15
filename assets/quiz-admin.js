@@ -9,6 +9,7 @@ function quizAdminIsSection(section) {
 
 function quizAdminEnter(section) {
   if (!isAdmin() || !quizAdminIsSection(section)) return;
+  if (section !== "accounts") quizState.admin.accountDetails = null;
   quizAdminLoad(section).then(() => {
     if (state.screen === "admin" && state.admin.section === section) render();
   });
@@ -1016,78 +1017,249 @@ Bitte melde dich mit dem Einmalpasswort an und setze danach sofort ein neues Pas
   </section>`;
 }
 
+function quizAccountIsSelf(account) {
+  return Boolean(account && state.profile && account.id === state.profile.id);
+}
+
+// Admins dürfen an anderen Admins keine Aktionen ausführen
+function quizAccountIsProtected(account) {
+  return Boolean(account && account.role === "admin" && !quizAccountIsSelf(account));
+}
+
+function quizAccountAttempts(account) {
+  return (quizState.admin.attempts || []).filter((a) => a.user_id === account.id);
+}
+
+function quizRolePill(account) {
+  return account.role === "admin"
+    ? `<span class="status-pill admin">Admin</span>`
+    : `<span class="status-pill user">Mitglied</span>`;
+}
+
+function quizAccountStatusPill(account) {
+  if (account.status === "disabled") return `<span class="status-pill bad">deaktiviert</span>`;
+  if (account.status === "approved") return `<span class="status-pill ok">freigegeben</span>`;
+  return `<span class="status-pill wait">${e(account.status)}</span>`;
+}
+
+function quizAccountQuizPill(account) {
+  if (!account.quiz_required) return `<span class="muted">nicht angefordert</span>`;
+  const overdue =
+    account.quiz_deadline && new Date(account.quiz_deadline).getTime() < Date.now();
+  return `${
+    overdue ? `<span class="status-pill bad">Frist abgelaufen</span>` : `<span class="status-pill wait">Prüfung offen</span>`
+  }<small class="flag-note">${e(quizDeadlineText(account.quiz_deadline))}</small>`;
+}
+
+function quizDateTimeInputValue(value) {
+  const date = value ? new Date(value) : new Date(Date.now() + 7 * 86400000);
+  if (Number.isNaN(date.getTime())) return quizLocalDateTimeValue(7);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function quizAdminAccounts() {
   const accounts = quizState.admin.accounts;
-  const attempts = quizState.admin.attempts || [];
+  const detailId = quizState.admin.accountDetails;
+  const account = detailId ? accounts.find((a) => a.id === detailId) : null;
+  if (detailId && !account) quizState.admin.accountDetails = null;
+  return `${quizOtpCard()}${account ? quizAccountDetail(account) : quizAccountOverview(accounts)}`;
+}
+
+function quizAccountOverview(accounts) {
+  const admins = accounts.filter((a) => a.role === "admin").length;
   return `
-  ${quizOtpCard()}
   <section class="card admin-panel">
     <div class="admin-panel-head">
       <div>
         <h2>Konten</h2>
-        <p class="panel-hint">Konten deaktivieren, Passwörter zurücksetzen, Prüfungen anfordern und Zusatzversuche freigeben. „Konto löschen“ entfernt das Konto endgültig aus Supabase (Auth-Konto, Profil und alle Versuche).</p>
+        <p class="panel-hint">
+          ${accounts.length} Konto${accounts.length === 1 ? "" : "en"} · ${admins} Admin${admins === 1 ? "" : "s"}.
+          Öffne „Details“, um Zugang, Rolle, Prüfungsfrist und Versuche zu verwalten.
+        </p>
       </div>
       <button class="btn btn-ghost btn-sm" type="button" data-quiz-admin="reload" data-section="accounts">Aktualisieren</button>
     </div>
-    <div class="admin-table account-table">
-      <div class="admin-table-head account-head">
-        <span>Konto</span><span>Status</span><span>Prüfung</span><span>Versuche</span><span>Aktionen</span>
+    <div class="account-overview">
+      <div class="account-overview-head" aria-hidden="true">
+        <span>Konto</span><span>Rolle</span><span>Status</span><span>Prüfung</span><span></span>
       </div>
       ${accounts
         .map((account) => {
-          const userAttempts = attempts.filter((a) => a.user_id === account.id);
-          const graded = userAttempts.filter((a) => a.status === "graded");
-          const best = graded.reduce((max, a) => Math.max(max, quizNum(a.percentage)), 0);
-          const isSelf = account.id === state.profile?.id;
+          const self = quizAccountIsSelf(account);
           return `
-          <div class="admin-table-row account-row">
-            <span class="admin-table-title">
-              <strong>${e(account.discord_username)}${isSelf ? " (du)" : ""}</strong>
-              <small>${e(account.roblox_username || "—")} · ${account.role === "admin" ? "Admin" : "Mitglied"} · seit ${e(quizFormatDate(account.created_at))}</small>
-            </span>
-            <span>
-              ${account.status === "disabled" ? `<span class="status-pill bad">deaktiviert</span>` : account.status === "approved" ? `<span class="status-pill ok">freigegeben</span>` : `<span class="status-pill wait">${e(account.status)}</span>`}
+          <article class="account-card${self ? " is-self" : ""}">
+            <div class="account-card-main">
+              <strong>${e(account.discord_username)}${self ? ` <span class="self-tag">du</span>` : ""}</strong>
+              <small>${e(account.roblox_username || "kein Roblox-Name")} · seit ${e(quizFormatDate(account.created_at))}</small>
               ${account.disabled_reason ? `<small class="flag-note">${e(account.disabled_reason)}</small>` : ""}
+            </div>
+            <span>${quizRolePill(account)}</span>
+            <span>${quizAccountStatusPill(account)}</span>
+            <span>${quizAccountQuizPill(account)}</span>
+            <span class="account-card-action">
+              <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="account-details" data-id="${e(account.id)}">Details</button>
             </span>
-            <span>
-              ${
-                account.quiz_required
-                  ? `<span class="status-pill wait">angefordert</span><small class="flag-note">${e(quizDeadlineText(account.quiz_deadline))}</small>`
-                  : `<span class="muted">—</span>`
-              }
-            </span>
-            <span>
-              ${userAttempts.length} Versuch${userAttempts.length === 1 ? "" : "e"} · ${account.extra_attempts || 0} extra
-              ${best ? `<small class="flag-note">best ${quizFmt(best)} %</small>` : ""}
-            </span>
-            <span class="account-actions">
-              <div class="account-action-line">
-                <button class="link-btn ${account.status === "disabled" ? "" : "danger"}" type="button"
-                  data-quiz-admin="toggle-account" data-id="${e(account.id)}" data-status="${account.status === "disabled" ? "approved" : "disabled"}"
-                  ${isSelf ? "disabled" : ""}>
-                  ${account.status === "disabled" ? "Aktivieren" : "Deaktivieren"}
-                </button>
-                <button class="link-btn" type="button" data-quiz-admin="reset-password" data-id="${e(account.id)}" ${isSelf ? "disabled" : ""}>Passwort zurücksetzen</button>
-                <button class="link-btn" type="button" data-quiz-admin="grant-attempt" data-id="${e(account.id)}">Versuch freigeben</button>
-              </div>
-              <div class="account-action-line">
-                <input class="account-deadline" type="datetime-local" data-account-deadline="${e(account.id)}" value="${quizLocalDateTimeValue(14)}" aria-label="Frist" />
-                <input class="account-note" type="text" data-account-note="${e(account.id)}" placeholder="Notiz (optional)" maxlength="200" aria-label="Notiz" />
-                <button class="link-btn" type="button" data-quiz-admin="require-quiz" data-id="${e(account.id)}">Prüfung anfordern</button>
-                ${account.quiz_required ? `<button class="link-btn danger" type="button" data-quiz-admin="clear-requirement" data-id="${e(account.id)}">Anforderung entfernen</button>` : ""}
-                <button class="link-btn danger" type="button" data-quiz-admin="delete-account" data-id="${e(account.id)}" data-name="${e(account.discord_username)}" ${isSelf ? "disabled" : ""}>Konto löschen</button>
-              </div>
-            </span>
-          </div>`;
+          </article>`;
         })
         .join("")}
     </div>
   </section>`;
 }
 
+function quizAccountDetail(account) {
+  const self = quizAccountIsSelf(account);
+  const protectedAccount = quizAccountIsProtected(account);
+  const locked = self || protectedAccount;
+  const userAttempts = quizAccountAttempts(account);
+  const graded = userAttempts.filter((a) => a.status === "graded");
+  const best = graded.reduce((max, a) => Math.max(max, quizNum(a.percentage)), 0);
+  const nextRole = account.role === "admin" ? "user" : "admin";
+  const disabledAttr = locked ? "disabled" : "";
+
+  return `
+  <section class="card admin-panel account-detail">
+    <div class="account-detail-head">
+      <div>
+        <button class="link-btn" type="button" data-quiz-admin="account-back">← Zur Kontenübersicht</button>
+        <h2>${e(account.discord_username)}${self ? ` <span class="self-tag">du</span>` : ""}</h2>
+        <p class="panel-hint">${e(account.roblox_username || "kein Roblox-Name")} · Mitglied seit ${e(quizFormatDate(account.created_at))}</p>
+      </div>
+      <div class="account-detail-badges">
+        ${quizRolePill(account)}
+        ${quizAccountStatusPill(account)}
+      </div>
+    </div>
+
+    ${
+      protectedAccount
+        ? `<div class="account-locked"><strong>Aktionen gesperrt</strong><span>Admins können an anderen Admin-Konten keine Aktionen ausführen.</span></div>`
+        : ""
+    }
+    ${
+      self && !protectedAccount
+        ? `<div class="account-locked info"><strong>Dein eigenes Konto</strong><span>Die eigene Rolle und die Zugangsdaten lassen sich hier nicht ändern.</span></div>`
+        : ""
+    }
+
+    <div class="account-detail-grid">
+      <section class="account-action-card">
+        <h3>Zugang</h3>
+        <p>Konto deaktivieren, Passwort zurücksetzen oder endgültig löschen.</p>
+        <div class="account-action-stack">
+          <button class="btn btn-secondary btn-sm" type="button"
+            data-quiz-admin="toggle-account" data-id="${e(account.id)}" data-status="${account.status === "disabled" ? "approved" : "disabled"}"
+            ${disabledAttr}>
+            ${account.status === "disabled" ? "Konto aktivieren" : "Konto deaktivieren"}
+          </button>
+          <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="reset-password" data-id="${e(account.id)}" ${disabledAttr}>
+            Passwort zurücksetzen
+          </button>
+          <button class="btn btn-danger btn-sm" type="button" data-quiz-admin="delete-account" data-id="${e(account.id)}" data-name="${e(account.discord_username)}" ${disabledAttr}>
+            Konto löschen
+          </button>
+        </div>
+        <p class="panel-hint">„Konto löschen“ entfernt Auth-Konto, Profil und alle Versuche endgültig.</p>
+      </section>
+
+      <section class="account-action-card">
+        <h3>Rolle</h3>
+        <p>Dieses Konto ist derzeit <strong>${account.role === "admin" ? "Admin" : "Mitglied"}</strong>.</p>
+        <div class="account-action-stack">
+          <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="set-role" data-id="${e(account.id)}" data-role="${nextRole}" ${disabledAttr}>
+            ${nextRole === "admin" ? "Zum Admin machen" : "Zum Mitglied machen"}
+          </button>
+        </div>
+        <p class="panel-hint">Admins können an anderen Admins keine Aktionen ausführen.</p>
+      </section>
+
+      <section class="account-action-card">
+        <h3>Prüfung &amp; Frist</h3>
+        <p>
+          ${
+            account.quiz_required
+              ? `Prüfung angefordert – ${e(quizDeadlineText(account.quiz_deadline))}.`
+              : "Aktuell ist keine Prüfung angefordert."
+          }
+        </p>
+        <label class="account-field">
+          <span>Frist</span>
+          <input class="account-deadline" type="datetime-local" data-account-deadline="${e(account.id)}"
+            value="${quizDateTimeInputValue(account.quiz_deadline)}" aria-label="Frist" ${disabledAttr} />
+        </label>
+        <div class="account-presets">
+          <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="1">+1 Tag</button>
+          <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="3">+3 Tage</button>
+          <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="7">+7 Tage</button>
+          <button class="link-btn" type="button" data-quiz-admin="deadline-preset" data-id="${e(account.id)}" data-days="14">+14 Tage</button>
+        </div>
+        <label class="account-field">
+          <span>Notiz (optional)</span>
+          <input class="account-note" type="text" data-account-note="${e(account.id)}" value="${e(account.quiz_required_note || "")}"
+            placeholder="z. B. Prüfung nach Einweisung" maxlength="200" aria-label="Notiz" ${disabledAttr} />
+        </label>
+        <div class="account-action-stack">
+          <button class="btn btn-primary btn-sm" type="button" data-quiz-admin="require-quiz" data-id="${e(account.id)}" ${disabledAttr}>
+            Prüfung anfordern
+          </button>
+          ${
+            account.quiz_required
+              ? `<button class="link-btn danger" type="button" data-quiz-admin="clear-requirement" data-id="${e(account.id)}" ${disabledAttr}>Anforderung entfernen</button>`
+              : ""
+          }
+        </div>
+      </section>
+
+      <section class="account-action-card">
+        <h3>Versuche</h3>
+        <p>
+          ${userAttempts.length} Versuch${userAttempts.length === 1 ? "" : "e"} · ${account.extra_attempts || 0} zusätzlich freigegeben
+          ${best ? ` · bestes Ergebnis ${quizFmt(best)} %` : ""}
+        </p>
+        <div class="account-action-stack">
+          <button class="btn btn-secondary btn-sm" type="button" data-quiz-admin="grant-attempt" data-id="${e(account.id)}" ${disabledAttr}>
+            Versuch freigeben
+          </button>
+        </div>
+        ${
+          userAttempts.length
+            ? `<ul class="account-attempt-list">
+                ${userAttempts
+                  .slice(0, 6)
+                  .map(
+                    (attempt) => `
+                  <li>
+                    ${quizStatusPill(attempt.status)}
+                    <span>${e(quizFormatDate(attempt.started_at))}</span>
+                    <strong>${attempt.percentage == null ? "—" : `${quizFmt(attempt.percentage)} %`}</strong>
+                  </li>`
+                  )
+                  .join("")}
+              </ul>`
+            : `<p class="panel-hint">Noch keine Versuche vorhanden.</p>`
+        }
+      </section>
+    </div>
+  </section>`;
+}
+
+
 async function quizAccountAction(action, id, dataset = {}) {
   const deadlineInput = document.querySelector(`[data-account-deadline="${id}"]`);
   const noteInput = document.querySelector(`[data-account-note="${id}"]`);
+  const account = quizState.admin.accounts.find((a) => a.id === id);
+  if (!account) {
+    showToast("Konto nicht gefunden.");
+    return;
+  }
+  if (quizAccountIsProtected(account)) {
+    showToast("Admins können an anderen Admin-Konten keine Aktionen ausführen.");
+    return;
+  }
+  if (quizAccountIsSelf(account)) {
+    showToast("Aktionen am eigenen Konto sind hier gesperrt.");
+    return;
+  }
   try {
     if (action === "toggle-account") {
       const nextStatus = dataset.status;
@@ -1128,6 +1300,13 @@ async function quizAccountAction(action, id, dataset = {}) {
       const { data, error } = await sb.rpc("grant_quiz_attempt", { target: id });
       if (error) throw error;
       showToast(`Weiterer Versuch freigegeben (${data}).`);
+    } else if (action === "set-role") {
+      const nextRole = dataset.role === "admin" ? "admin" : "user";
+      const nextLabel = nextRole === "admin" ? "Admin" : "Mitglied";
+      if (!window.confirm(`${account.discord_username} wirklich zum ${nextLabel} machen?`)) return;
+      const { error } = await sb.from("profiles").update({ role: nextRole }).eq("id", id);
+      if (error) throw error;
+      showToast(`${account.discord_username} ist jetzt ${nextLabel}.`);
     } else if (action === "delete-account") {
       const name = dataset.name || "";
       const typed = window.prompt(
@@ -1285,7 +1464,30 @@ function quizAdminBindEvents() {
       render();
       return;
     }
-    if (action === "toggle-account" || action === "reset-password" || action === "require-quiz" || action === "clear-requirement" || action === "grant-attempt" || action === "delete-account") {
+    if (action === "account-details") {
+      quizState.admin.accountDetails = id;
+      render();
+      return;
+    }
+    if (action === "account-back") {
+      quizState.admin.accountDetails = null;
+      render();
+      return;
+    }
+    if (action === "deadline-preset") {
+      const input = document.querySelector(`[data-account-deadline="${id}"]`);
+      if (input) input.value = quizLocalDateTimeValue(Number(actionEl.dataset.days) || 7);
+      return;
+    }
+    if (
+      action === "toggle-account" ||
+      action === "reset-password" ||
+      action === "require-quiz" ||
+      action === "clear-requirement" ||
+      action === "grant-attempt" ||
+      action === "set-role" ||
+      action === "delete-account"
+    ) {
       quizAccountAction(action, id, actionEl.dataset);
       return;
     }

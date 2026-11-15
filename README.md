@@ -34,9 +34,12 @@ Eingabefelder und Situationen in Supabase anlegen.
   ob ein Versuch bestanden ist, entscheidet der Admin bei der Bewertung
 - **Admin-Bereich** für Anfragen, Befehle/Eingabefelder, eigene Situationen,
   Quizfragen, Bewertungen, Quiz-Einstellungen und Konten
-- **Kontoverwaltung:** deaktivieren, Passwort per Einmalpasswort zurücksetzen,
-  Prüfung mit Frist anfordern, Zusatzversuch freigeben und Konten vollständig
-  löschen (Auth-Konto, Profil und alle Versuche in Supabase)
+- **Kontoverwaltung:** pro Konto eine eigene Detailseite mit Aktionen für Zugang,
+  Rolle, Prüfungsfrist und Versuche; Admins können Mitglieder zu Admins machen
+  (Aktionen an anderen Admin-Konten sind gesperrt)
+- **Prüfungsfristen:** gelbes Hinweisbanner bis zur Frist, rotes Banner nach
+  Ablauf; zusätzlich Desktop-Benachrichtigungen und eine Benachrichtigungsbox
+  mit Glocke in der Kopfzeile
 - **Ergebnis-Export** als CSV: eine Übersicht aller bewerteten Versuche und ein
   Detail-Export mit jeder Antwort und Musterlösung
 - **Auswertung:** Befehlswahl 4 P., Angaben und Zusatzmaßnahmen zusammen 6 P.
@@ -144,8 +147,10 @@ laufenden Quiz ist der Tab gesperrt.
   markiert. Der Seitentitel zeigt währenddessen „Seite derzeit nicht verfügbar“.
 - **Aufbewahrung:** Auswertungen bleiben 12 Wochen nach der Freigabe sichtbar und
   werden danach datensparsam gelöscht (`prune_quiz_attempts`).
-- **Prüfungspflicht:** Admins können eine Prüfung mit Frist und Notiz anfordern;
-  Betroffene sehen ein Hinweisbanner mit Ausrufezeichen.
+- **Prüfungspflicht:** Admins können in den Kontodetails eine Prüfung mit Frist
+  und Notiz anfordern. Betroffene sehen bis zur Frist ein gelbes Hinweisbanner,
+  nach Ablauf wird es rot. Zusätzlich erscheinen die Hinweise in der
+  Benachrichtigungsbox (Glocke) und – nach Freigabe – als Desktop-Benachrichtigung.
 
 ### Grenzen der Sperre
 
@@ -157,14 +162,19 @@ Vollständiger Schutz ist nur mit einer kontrollierten Prüfungsumgebung möglic
 
 ## Konten und Einmalpasswörter
 
-1. Admin → **Konten** → **Passwort zurücksetzen**
-2. Der kopierbare Text enthält Website-Link, Discord-Benutzername und ein
-   Einmalpasswort
-3. Nach der Anmeldung mit dem Einmalpasswort muss sofort ein neues Passwort
+1. Admin → **Konten** → beim gewünschten Konto **Details** öffnen
+2. Dort stehen Zugang (deaktivieren, Passwort zurücksetzen, löschen), Rolle,
+   Prüfungsfrist und Versuche getrennt zur Verfügung
+3. **Zum Admin machen** bzw. **Zum Mitglied machen** ändert die Rolle
+4. **Passwort zurücksetzen** erzeugt einen kopierbaren Text mit Website-Link,
+   Discord-Benutzername und Einmalpasswort
+5. Nach der Anmeldung mit dem Einmalpasswort muss sofort ein neues Passwort
    gesetzt werden; alle alten Sitzungen werden beendet
-4. **Deaktivieren** sperrt das Konto mit optionalem Grund; die Anmeldung zeigt
+6. **Deaktivieren** sperrt das Konto mit optionalem Grund; die Anmeldung zeigt
    dann nur noch den Hinweis auf Admin Jann (Discord `jlg09`) bzw. den
    DVN-Discord-Staff-Bereich
+7. Aktionen an anderen Admin-Konten sind gesperrt; das eigene Konto kann nicht
+   herabgestuft oder gelöscht werden
 
 Kann etwas nicht gespeichert werden, zeigt die Seite denselben Kontakt-Hinweis.
 
@@ -172,9 +182,9 @@ Kann etwas nicht gespeichert werden, zeigt die Seite denselben Kontakt-Hinweis.
 
 - **Versuch löschen:** Admin → **Bewertungen** → **Löschen** entfernt einen
   einzelnen Versuch samt Antworten und Auswertung.
-- **Konto löschen:** Admin → **Konten** → **Konto löschen** entfernt nach
-  Eingabe des Discord-Namens das Auth-Konto in Supabase; Profil und alle
-  Versuche werden per `on delete cascade` mitgelöscht.
+- **Konto löschen:** Admin → **Konten** → **Details** → **Konto löschen**
+  entfernt nach Eingabe des Discord-Namens das Auth-Konto in Supabase; Profil
+  und alle Versuche werden per `on delete cascade` mitgelöscht.
 - Das eigene Konto und das letzte verbleibende Admin-Konto können nicht
   gelöscht werden.
 
@@ -207,6 +217,7 @@ assets/scenes.js               SVG-Streckenbilder
 assets/app.js                  Auth, Training, Auswertung, Admin
 assets/quiz.js                 Regelwerk, Quiz, Anti-Cheat, Kontoseiten
 assets/quiz-admin.js           Quizfragen, Bewertung, Einstellungen, Konten
+assets/notifications.js        Glocke, Benachrichtigungsbox, Desktop-Hinweise
 assets/styles.css              Design und responsive Layout
 assets/vendor/supabase.js      Supabase JS Client (lokal gehostet)
 supabase/migrations/           Datenbankschema, Seeds und Korrekturen

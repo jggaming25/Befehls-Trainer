@@ -70,6 +70,7 @@ const quizState = {
     settings: null,
     attempts: [],
     accounts: [],
+    accountDetails: null,
     questionDraft: null,
     grading: null,
     gradingKeys: [],
@@ -307,12 +308,20 @@ function updateQuizAlert() {
     } else if (profile.quiz_required) {
       const passed = quizState.attempts.some((a) => quizPassed(a));
       if (!passed) {
+        const deadline = profile.quiz_deadline ? new Date(profile.quiz_deadline) : null;
+        const overdue = Boolean(deadline && deadline.getTime() < Date.now());
+        const note = profile.quiz_required_note ? ` ${e(profile.quiz_required_note)}` : "";
+        const when = profile.quiz_deadline
+          ? overdue
+            ? `Die Frist ist am ${e(formatDate(profile.quiz_deadline))} abgelaufen.`
+            : `Frist: ${e(quizDeadlineText(profile.quiz_deadline))}.`
+          : "Es wurde keine Frist gesetzt.";
         html = `
-          <div class="alert-inner alert-warn">
+          <div class="alert-inner ${overdue ? "alert-danger" : "alert-warn"}">
             <span class="alert-mark">!</span>
             <div class="alert-copy">
-              <strong>Quiz / Prüfung erforderlich</strong>
-              <span>${profile.quiz_deadline ? `Frist: ${e(quizDeadlineText(profile.quiz_deadline))}.` : "Es wurde keine Frist gesetzt."}${profile.quiz_required_note ? ` ${e(profile.quiz_required_note)}` : ""}</span>
+              <strong>${overdue ? "Frist abgelaufen – Prüfung überfällig" : "Quiz-Prüfung bis zur Frist ablegen"}</strong>
+              <span>${when}${note} Bitte lege die Prüfung ${overdue ? "umgehend" : "bis zur Frist"} ab.</span>
             </div>
             <button class="btn btn-primary btn-sm" type="button" data-nav="quiz">Zum Quiz</button>
           </div>`;

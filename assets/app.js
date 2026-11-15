@@ -2343,6 +2343,7 @@ function render({ preserveScroll = false } = {}) {
 
   syncAdminRealtime();
   syncStatusPolling();
+  if (typeof syncNotifications === "function") syncNotifications();
 
   if (preserveScroll) window.scrollTo({ top: scrollY });
   else window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
