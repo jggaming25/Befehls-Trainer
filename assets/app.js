@@ -992,22 +992,18 @@ function orderForm(command) {
         "Befehle 1 – 9",
         "Vorderseite · standardisierte Befehle (TSI OPE)",
         vorne,
-        !state.current.command
-          ? "Seite 1 von 2"
-          : vordruckSectionOf(command.nr) === "vorne"
-          ? "Seite 1 von 1"
-          : "nicht Bestandteil",
+        state.queue.length === 1
+          ? "1/1"
+          : `${state.index + 1} / ${state.queue.length}`,
         Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "vorne"
       )}
       ${vordruckSection(
         "Befehle 21 – 95",
         "Rückseite · nationale Befehle der DB",
         hinten,
-        !state.current.command
-          ? "Seite 2 von 2"
-          : vordruckSectionOf(command.nr) === "hinten"
-          ? "Seite 1 von 1"
-          : "nicht Bestandteil",
+        state.queue.length === 1
+          ? "1/1"
+          : `${state.index + 1} / ${state.queue.length}`,
         Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "hinten"
       )}
 
@@ -1328,6 +1324,78 @@ function summaryScreen() {
       <button class="btn btn-ghost btn-lg" data-action="home">Zur Startseite</button>
     </div>
     <p class="summary-footnote">Dieses Training wird nicht gespeichert. Beim Neuladen der Seite beginnst du von vorn.</p>
+  </div>`;
+}
+
+/* --------------------------------------------------------------------------
+   Guide – Erklärung des Befehlsvordrucks
+   -------------------------------------------------------------------------- */
+function guideScreen() {
+  const order = typeof buildOrderData === "function" ? buildOrderData(state.queue[state.index]) : null;
+  const header = state.current.header || {};
+  const scenario = state.queue[state.index];
+  const cmd = scenario && scenario.command ? getCommand(scenario.command) : null;
+
+  const fieldExplanations = {
+    A: "Zugnummer – z. B. RE 4711 (aus der Tf-Meldung)",
+    B: "Datum – TT.MM.JJJJ (vom Fdl angesagt)",
+    C: "Standort des Zuges – z. B. Bf Musterstadt · Esig 60A (aus der Tf-Meldung)",
+    D: "Standort des Anweisenden – z. B. Bf Musterstadt (Dienststelle des Fdl)",
+    E: "Anzahl der Vordrucke – z. B. 1 (vom Fdl angesagt)",
+    V: "Name Tf – Nachname des Triebfahrzeugführers (aus der Tf-Meldung)",
+    W: "Name Anweisender – Nachname des Fdl (aus der Fdl-Anweisung)",
+    Y: "Uhrzeit – HH:MM (mit Datum und Kennung angesagt)",
+    Z: "Eindeutige Kennung – BT-<Zug>-<HHMM> (Verbindung von Vordruck und Zugfunk)"
+  };
+
+  const pointDistr = {
+    training: "Pro korrekter Eingabe gibt es Punkte (maximal 10 pro Situation).",
+    quiz: "Im Quiz werden ca. 60 % der Punkte automatisch vergeben, der Rest entscheidet der Admin."
+  };
+
+  return `
+  <div class="guide-wrap">
+    <section class="card guide-card">
+      <header class="guide-head">
+        <div>
+          <h2>DVN FDL Training</h2>
+          <p class="guide-sub">Erklärung des Befehlsvordrucks Ril 408.2411 V01</p>
+        </div>
+        <button class="btn btn-ghost guide-close" type="button" aria-label="Guide schließen">×</button>
+      </header>
+
+      <div class="guide-content">
+        <h3>1. Vordruck-Kopfzeile (Pflichtfeld)</h3>
+        <p>Die Kopfzeile muss vollständig ausgefüllt werden, bevor der Befehl abgeschickt werden kann.</p>
+        <table class="guide-table">
+          <tr><td class="guide-cell guide-cell-A">A – Zugnummer</td><td class="guide-explain">${fieldExplanations.A}</td></tr>
+          <tr><td class="guide-cell guide-cell-B">B – Datum</td><td class="guide-explain">${fieldExplanations.B}</td></tr>
+          <tr><td class="guide-cell guide-cell-C">C – Standort des Zuges</td><td class="guide-explain">${fieldExplanations.C}</td></tr>
+          <tr><td class="guide-cell guide-cell-D">D – Standort des Anweisenden</td><td class="guide-explain">${fieldExplanations.D}</td></tr>
+          <tr><td class="guide-cell guide-cell-E">E – Anzahl der Vordrucke</td><td class="guide-explain">${fieldExplanations.E}</td></tr>
+          <tr><td class="guide-cell guide-cell-V">V – Name Tf</td><td class="guide-explain">${fieldExplanations.V}</td></tr>
+          <tr><td class="guide-cell guide-cell-W">W – Name Anweisender</td><td class="guide-explain">${fieldExplanations.W}</td></tr>
+          <tr><td class="guide-cell guide-cell-Y">Y – Uhrzeit</td><td class="guide-explain">${fieldExplanations.Y}</td></tr>
+          <tr><td class="guide-cell guide-cell-Z">Z – Eindeutige Kennung</td><td class="guide-explain">${fieldExplanations.Z}</td></tr>
+        </table>
+
+        <h3>2. Befehle auswählen und Felder ausfüllen</h3>
+        <p>Kreuze den passenden Befehl im Vordruck an und trage die Angaben auf den Linien ein. Nicht zutreffende Zeilen sind durchzustreichen.</p>
+
+        <h3>3. Punktverteilung</h3>
+        <p>${pointDistr.training}</p>
+        <p>${pointDistr.quiz}</p>
+
+        <h3>4. GSM-R Zugfunk</h3>
+        <p>Der Vordruck wird vollständig aus den GSM-R-Daten des Fahrdienstleiters ausgefüllt.</p>
+        <p>Folgende Informationen stehen im Zugfunk:</p>
+        <ul>
+          <li>Tf-Meldung: Zugnummer, Standort, Uhrzeit, Name Tf</li>
+          <li>Fdl-Anweisung: Alle Feldwerte, Kopfzeile, Zusatzmaßnahmen</li>
+          <li>Rücklesen: Tf bestätigt den Befehl</li>
+        </ul>
+      </div>
+    </section>
   </div>`;
 }
 
@@ -2201,6 +2269,8 @@ function render({ preserveScroll = false } = {}) {
     app.innerHTML = summaryScreen();
   } else if (state.screen === "admin") {
     app.innerHTML = adminScreen();
+  } else if (state.screen === "guide") {
+    app.innerHTML = guideScreen();
   } else if (typeof quizIsScreen === "function" && quizIsScreen(state.screen)) {
     app.innerHTML = quizScreen();
   } else if (state.screen === "change-password" || state.screen === "disabled") {
