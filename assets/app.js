@@ -21,6 +21,9 @@ const mainNav = document.getElementById("main-nav");
 
 // Referenz-Button Sichtbarkeit: wird nach Guide-Schließen eingeblendet
 let referenceVisible = false;
+// Bildschirm, zu dem der Guide beim Schließen zurückkehrt
+let guideReturnScreen = "train";
+const GUIDE_RETURN_SCREENS = ["start", "train", "result", "summary", "rulebook", "quiz", "quizrun", "quizresult"];
 
 // Navigations-Handler: data-nav Buttons zum Wechseln des screens
 if (mainNav) {
@@ -41,6 +44,10 @@ if (mainNav) {
         guide: "guide",
       };
       if (screenMap[nav] !== undefined) {
+        // Beim Öffnen des Guides den aktuellen Bildschirm als Rückkehrziel merken
+        if (nav === "guide" && state.screen !== "guide") {
+          guideReturnScreen = GUIDE_RETURN_SCREENS.includes(state.screen) ? state.screen : "start";
+        }
         state.screen = screenMap[nav];
         render();
       }
@@ -48,15 +55,23 @@ if (mainNav) {
   });
 }
 
-// Guide schließen: Close-Button oder Klick außerhalb
-// Zieht referenceVisible auf true (Button wird eingeblendet)
+// Guide schließen: Close-Button oder Klick neben das Guide-Fenster
+// Zieht referenceVisible auf true (Befehlsübersicht wird eingeblendet)
+function closeGuide() {
+  referenceVisible = true;
+  state.screen = GUIDE_RETURN_SCREENS.includes(guideReturnScreen) ? guideReturnScreen : "start";
+  render();
+}
+
 document.addEventListener("click", (event) => {
-  const guideClose = event.target.closest(".guide-close");
-  if (guideClose) {
-    referenceVisible = true;
-    state.screen = "train";
-    render();
+  if (event.target.closest(".guide-close")) {
+    closeGuide();
+    return;
   }
+  if (state.screen !== "guide") return;
+  // Klicks im Guide-Fenster und in der Kopfzeile schließen den Guide nicht
+  if (event.target.closest(".guide-card") || event.target.closest(".appbar")) return;
+  closeGuide();
 });
 const toastEl = document.getElementById("toast");
 const referenceModal = document.getElementById("reference-modal");
@@ -487,6 +502,8 @@ function updateHeader() {
   const navTarget =
     state.screen === "rulebook"
       ? "rulebook"
+      : state.screen === "guide"
+      ? "guide"
       : ["quiz", "quizrun", "quizresult"].includes(state.screen)
       ? "quiz"
       : "start";
@@ -494,7 +511,8 @@ function updateHeader() {
   headerProgress.hidden = !showProgress;
   headerScore.hidden = !showProgress;
   headerEnd.hidden = !inTraining;
-  referenceButton.hidden = !approved || !["train", "result"].includes(state.screen) || !referenceVisible;
+  referenceButton.hidden =
+    !approved || !referenceVisible || !GUIDE_RETURN_SCREENS.includes(state.screen);
   adminButton.hidden = !isAdmin() || state.screen === "admin";
   logoutButton.hidden = !state.session;
   headerUser.hidden = !state.profile;
@@ -1399,14 +1417,16 @@ function guideScreen() {
     <section class="card guide-card">
       <header class="guide-head">
         <div>
-          <h2>DVN FDL Training</h2>
+          <h2>Guide: Befehlsvordruck</h2>
           <p class="guide-sub">Erklärung des Befehlsvordrucks Ril 408.2411 V01</p>
         </div>
-        <button class="btn btn-ghost guide-close" type="button" aria-label="Guide schließen">×</button>
+        <button class="btn btn-secondary btn-sm guide-close" type="button" aria-label="Guide schließen">
+          <span aria-hidden="true">×</span> Guide schließen
+        </button>
       </header>
 
       <div class="guide-content">
-        <p class="guide-close-inst">Klicke außerhalb oder auf × zum Schließen</p>
+        <p class="guide-close-inst">Der Guide schließt sich über „Guide schließen“ oder mit einem Klick neben das Fenster.</p>
         <h3>1. Vordruck-Kopfzeile (Pflichtfeld)</h3>
         <p>Die Kopfzeile muss vollständig ausgefüllt werden, bevor der Befehl abgeschickt werden kann.</p>
         <table class="guide-table">

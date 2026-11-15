@@ -5640,3 +5640,138 @@ dialog::backdrop {
 .vordruck-seite.is-inactive {
   opacity: 0.58;
 }
+
+/* --------------------------------------------------------------------------
+   Guide – Erklärung des Befehlsvordrucks
+   -------------------------------------------------------------------------- */
+.guide-wrap {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.guide-card {
+  overflow: hidden;
+}
+
+.guide-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #fafbfd);
+}
+
+.guide-head h2 {
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.guide-sub {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.guide-close {
+  flex-shrink: 0;
+}
+
+.guide-close span[aria-hidden="true"] {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.guide-content {
+  padding: 6px 28px 28px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.guide-content h3 {
+  margin: 26px 0 8px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.guide-content h3:first-of-type {
+  margin-top: 20px;
+}
+
+.guide-content p {
+  margin: 0 0 10px;
+}
+
+.guide-content ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.guide-content li {
+  margin-bottom: 4px;
+}
+
+.guide-close-inst {
+  display: inline-block;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+
+.guide-table td {
+  padding: 9px 12px;
+  vertical-align: top;
+}
+
+.guide-table tr + tr td {
+  border-top: 1px solid var(--line);
+}
+
+.guide-table tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+
+.guide-cell {
+  width: 235px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.guide-explain {
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .guide-head {
+    padding: 18px 18px 16px;
+  }
+
+  .guide-content {
+    padding: 4px 18px 22px;
+    font-size: 14px;
+  }
+
+  .guide-table td {
+    padding: 8px 6px;
+  }
+
+  .guide-cell {
+    width: auto;
+  }
+}
