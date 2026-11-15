@@ -1021,6 +1021,7 @@ function orderForm(command) {
         <span class="vordruck-strike-count">${struckCount} Zeile${struckCount === 1 ? "" : "n"} durchgestrichen</span>
         <button type="button" class="link-btn" data-action="strike-others">Alle anderen durchstreichen</button>
         <button type="button" class="link-btn" data-action="show-vordruck-image">Original-Vordruck anzeigen</button>
+        <button type="button" class="link-btn" data-action="vordruck-fullscreen">Vollscreen</button>
       </div>
  
       ${vordruckSection(
@@ -2573,6 +2574,13 @@ app.addEventListener("click", async (event) => {
     }
     if (action === "show-vordruck-image") {
       window.open("assets/vordruck-front.png", "_blank", "noopener");
+      return;
+    }
+    if (action === "vordruck-fullscreen") {
+      const vordruck = document.querySelector(".vordruck");
+      if (vordruck) {
+        vordruck.classList.toggle("vordruck-fullscreen");
+      }
       return;
     }
     if (action === "strike-others") {

@@ -4396,7 +4396,7 @@ dialog::backdrop {
   color: var(--muted);
 }
 
-/* Offizieller Befehlsvordruck – Originalbild als Wasserzeichen */
+/* Offizieller Befehlsvordruck - Originalbild als Wasserzeichen */
 .vordruck {
   position: relative;
 }
@@ -4404,7 +4404,7 @@ dialog::backdrop {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: url("vordruck-front.png?v=20261114d");
+  background-image: url("vordruck-front.png?v=20261114e");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center top;
@@ -4415,6 +4415,13 @@ dialog::backdrop {
 .vordruck > * {
   position: relative;
   z-index: 1;
+}
+.vordruck.vordruck-fullscreen::before {
+  opacity: 1;
+}
+.vordruck.vordruck-fullscreen {
+  z-index: 100;
+  overflow: hidden;
 }
 
 /* Offizieller Befehlsvordruck */
