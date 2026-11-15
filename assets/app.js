@@ -19,6 +19,9 @@ const logoutButton = document.getElementById("logout-button");
 const referenceButton = document.getElementById("reference-button");
 const mainNav = document.getElementById("main-nav");
 
+// Referenz-Button Sichtbarkeit: wird nach Guide-Schließen eingeblendet
+let referenceVisible = false;
+
 // Navigations-Handler: data-nav Buttons zum Wechseln des screens
 if (mainNav) {
   mainNav.addEventListener("click", (event) => {
@@ -46,9 +49,11 @@ if (mainNav) {
 }
 
 // Guide schließen: Close-Button oder Klick außerhalb
+// Zieht referenceVisible auf true (Button wird eingeblendet)
 document.addEventListener("click", (event) => {
   const guideClose = event.target.closest(".guide-close");
   if (guideClose) {
+    referenceVisible = true;
     state.screen = "train";
     render();
   }
@@ -489,7 +494,7 @@ function updateHeader() {
   headerProgress.hidden = !showProgress;
   headerScore.hidden = !showProgress;
   headerEnd.hidden = !inTraining;
-  referenceButton.hidden = !approved || !["train", "result"].includes(state.screen);
+  referenceButton.hidden = !approved || !["train", "result"].includes(state.screen) || !referenceVisible;
   adminButton.hidden = !isAdmin() || state.screen === "admin";
   logoutButton.hidden = !state.session;
   headerUser.hidden = !state.profile;

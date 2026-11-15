@@ -1121,6 +1121,15 @@ function quizReviewItem(item, graded) {
   const points = graded || item.type === "command" ? earned : null;
   const max = quizNum(item.points);
   const pending = points == null;
+  // Anzeige: automatisch bewertet oder manuell durch Admin
+  let gradeLabel = "";
+  if (item.type === "multiple_choice") {
+    gradeLabel = `<span class="quiz-grade-label auto">automatisch</span>`;
+  } else if (item.type === "command") {
+    gradeLabel = `<span class="quiz-grade-label manual">manuell durch Admin</span>`;
+  } else if (item.type === "short" || item.type === "long") {
+    gradeLabel = `<span class="quiz-grade-label manual">manuell bewerten</span>`;
+  }
   return `
   <article class="quiz-review-item ${pending ? "pending" : points >= max ? "full" : "partial"}">
     <header class="quiz-review-head">
@@ -1128,6 +1137,7 @@ function quizReviewItem(item, graded) {
         <span class="quiz-type">${e(QUIZ_TYPE_LABELS[item.type] || item.type)}</span>
         <h3>${e(item.prompt)}</h3>
       </div>
+      ${gradeLabel}
       <span class="quiz-review-points">${pending ? "offen" : `${quizFmt(points)} / ${quizFmt(max)} P`}</span>
     </header>
     ${quizAnswerLines(item)}
