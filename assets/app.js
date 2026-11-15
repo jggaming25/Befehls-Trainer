@@ -18,6 +18,32 @@ const adminButton = document.getElementById("admin-button");
 const logoutButton = document.getElementById("logout-button");
 const referenceButton = document.getElementById("reference-button");
 const mainNav = document.getElementById("main-nav");
+
+// Navigations-Handler: data-nav Buttons zum Wechseln des screens
+if (mainNav) {
+  mainNav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-nav]");
+    if (button) {
+      const nav = button.dataset.nav;
+      // Mapping der data-nav Werte auf state.screen Werte
+      const screenMap = {
+        start: "start",
+        train: "train",
+        result: "result",
+        summary: "summary",
+        rulebook: "rulebook",
+        quiz: "quiz",
+        quizrun: "quizrun",
+        quizresult: "quizresult",
+        guide: "guide",
+      };
+      if (screenMap[nav] !== undefined) {
+        state.screen = screenMap[nav];
+        render();
+      }
+    }
+  });
+}
 const toastEl = document.getElementById("toast");
 const referenceModal = document.getElementById("reference-modal");
 const confirmModal = document.getElementById("confirm-modal");

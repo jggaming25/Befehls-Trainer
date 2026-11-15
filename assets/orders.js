@@ -153,18 +153,16 @@ function orderStationFromScenario(scenario) {
   const presetStation = preset.fdl_station || preset.fdlStation;
   if (presetStation) return String(presetStation);
 
-  const text = [
-    base.subtitle,
-    base.location,
-    base.situation,
-    base.title,
-    ...(Array.isArray(base.facts) ? base.facts : []),
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // Verwende nur den Ort aus der Szenario-Überschrift (subtitle) –
+  // ETCS-Fahrzeuggerät etc. bleiben außen vor.
+  const text = [base.subtitle, base.location].filter(Boolean).join(" ");
   if (typeof STATIONS !== "undefined" && Array.isArray(STATIONS)) {
     const found = STATIONS.find((station) => text.includes(station));
     if (found) return found;
+  }
+  // Fallback: erster Teil des subtitle-Textes vor dem Punkt/Leerzeichen
+  if (base.subtitle) {
+    return base.subtitle.split(/[.\s]/)[0];
   }
   return "Musterstadt";
 }
@@ -363,10 +361,10 @@ function orderNorm(value) {
   return String(value ?? "")
     .toLowerCase()
     .replace(/[–—−]/g, "-")
-    .replace(/[„“”‚‘’]/g, '"')
+    .replace(/[„“”‚‘'']/g, '"')
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/[.;:,]+$/g, "");
+    .replace(/[.;:]+$/g, "");
 }
 
 function orderHeaderValueOk(id, given, expected) {
@@ -418,43 +416,24 @@ function orderHeaderChecks(order, givenHeader) {
 }
 
 function orderStrikeChecks(order, givenStruck) {
-  const struck = givenStruck && typeof givenStruck === "object" ? givenStruck : {};
-  const rows = order.pageCommands || [];
-  const errors = [];
-  rows.forEach((command) => {
-    const expected = command.nr !== order.commandNr;
-    const actual = Boolean(struck[command.nr]);
-    if (expected === actual) return;
-    errors.push({
-      group: "Durchstreichung",
-      label: `Befehl ${command.nr} – ${command.title}`,
-      given: actual ? "durchgestrichen" : "nicht durchgestrichen",
-      expected: expected ? "durchstreichen" : "nicht durchstreichen",
-      ok: false,
-      points: 0,
-      max: 0,
-      note: "Nur der zutreffende Befehl bleibt offen; alle anderen Zeilen dieser Vordruckseite werden durchgestrichen.",
-    });
-  });
-
-  if (!errors.length) {
-    return {
-      checks: [
-        {
-          group: "Durchstreichung",
-          label: "Nicht zutreffende Zeilen",
-          given: "alle durchgestrichen",
-          expected: "alle durchgestrichen",
-          ok: true,
-          points: 0,
-          max: 0,
-          note: "Die Vordruckseite ist vollständig bearbeitet.",
-        },
-      ],
-      ok: true,
-    };
-  }
-  return { checks: errors, ok: false };
+  // Die Durchstreichungs-Funktion ist deaktiviert, da Befehle nicht durchgestrichen
+  // werden müssen. Wenn dennoch einzelnes erforderlich ist, kann die
+  // Funktionalität reaktiviert werden.
+  return {
+    checks: [
+      {
+        group: "Durchstreichung",
+        label: "Befehle nicht durchgestrichen",
+        given: "deaktiviert",
+        expected: "deaktiviert",
+        ok: true,
+        points: 0,
+        max: 0,
+        note: "Die Befehle bleiben offen; die Durchstreichungs-Funktion ist für diese Übung deaktiviert.",
+      },
+    ],
+    ok: true,
+  };
 }
 
 function orderMissingHeaderFields(header) {
