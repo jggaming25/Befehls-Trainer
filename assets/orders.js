@@ -392,7 +392,13 @@ function orderHeaderValueOk(id, given, expected) {
 }
 
 function orderValueMatches(given, expected) {
-  return orderNorm(given) === orderNorm(expected);
+  const left = orderNorm(given);
+  const right = orderNorm(expected);
+  if (!right) return true;
+  if (left === right) return true;
+  // Freitext: Satzzeichen und Leerzeichen großzügig ignorieren
+  const compact = (value) => value.replace(/[^a-z0-9äöüß]/g, "");
+  return Boolean(left) && compact(left) === compact(right);
 }
 
 function orderHeaderChecks(order, givenHeader) {

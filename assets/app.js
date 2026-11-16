@@ -92,6 +92,7 @@ const state = {
   index: 0,
   answers: [],
   current: { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" },
+  vordruckView: "scan",
   startedAt: null,
   endedAt: null,
   admin: {
@@ -893,19 +894,22 @@ function vordruckStruck(nr) {
 function vordruckFieldControl(cmd, field, index) {
   const value = state.current.fields[field.id] || "";
   const code = `${cmd.nr}.${String(index + 1).padStart(2, "0")}`;
+  const listId = `vdl-${cmd.nr}-${field.id}`;
+  const options = field.options || [];
   return `
   <label class="vfill">
     <span class="vfill-label"><span class="vfill-code">${e(code)}</span>${e(field.label)}</span>
     <span class="vfill-control">
-      <select data-field="${e(field.id)}" autocomplete="off" aria-label="${e(field.label)}">
-        <option value="" ${!value ? "selected" : ""} disabled>${e(field.placeholder || "eintragen …")}</option>
-        ${(field.options || [])
-          .map(
-            (option) =>
-              `<option value="${e(option)}" ${value === option ? "selected" : ""}>${e(option)}</option>`
-          )
-          .join("")}
-      </select>
+      <input type="text" data-field="${e(field.id)}" value="${e(value)}"
+        placeholder="${e(field.placeholder || "eintragen …")}" autocomplete="off" spellcheck="false"
+        list="${e(listId)}" aria-label="${e(field.label)}" />
+      ${
+        options.length
+          ? `<datalist id="${e(listId)}">${options
+              .map((option) => `<option value="${e(option)}"></option>`)
+              .join("")}</datalist>`
+          : ""
+      }
     </span>
   </label>`;
 }
@@ -948,9 +952,8 @@ function vordruckFill(cmd) {
 
 function vordruckRow(cmd) {
   const selected = state.current.command === cmd.nr;
-  const struck = vordruckStruck(cmd.nr);
   return `
-  <div class="vrow ${selected ? "is-selected" : ""} ${struck ? "is-struck" : ""}">
+  <div class="vrow ${selected ? "is-selected" : ""}">
     <label class="vrow-tick" title="Befehl ${e(cmd.nr)} ankreuzen">
       <input type="checkbox" data-command="${e(cmd.nr)}" ${selected ? "checked" : ""} aria-label="Befehl ${e(cmd.nr)} – ${e(cmd.title)}">
       <span class="vrow-box" aria-hidden="true"></span>
@@ -963,17 +966,13 @@ function vordruckRow(cmd) {
       </div>
       ${selected ? vordruckFill(cmd) : ""}
     </div>
-    <button type="button" class="vrow-strike-btn" data-action="strike-row" data-row="${e(cmd.nr)}"
-      aria-pressed="${struck}" title="${struck ? "Durchstreichung aufheben" : "Zeile durchstreichen"}">${
-    struck ? "↺" : "✕"
-  }</button>
   </div>`;
 }
 
-function vordruckSection(title, subtitle, commands, pageLabel, inactive = false) {
+function vordruckSection(title, subtitle, commands, pageLabel) {
   if (!commands.length) return "";
   return `
-  <section class="vordruck-seite ${inactive ? "is-inactive" : ""}">
+  <section class="vordruck-seite">
     <header class="vordruck-seite-head">
       <div>
         <strong>${e(title)}</strong>
@@ -981,7 +980,6 @@ function vordruckSection(title, subtitle, commands, pageLabel, inactive = false)
       </div>
       <span>${e(pageLabel || "")}</span>
     </header>
-    ${inactive ? `<p class="vordruck-page-note">Diese Seite ist nicht Bestandteil des Vordrucks.</p>` : ""}
     <div class="vrow-list">${commands.map(vordruckRow).join("")}</div>
   </section>`;
 }
@@ -1001,7 +999,6 @@ function orderForm(command) {
     </div>`;
   const vorne = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "vorne");
   const hinten = COMMANDS.filter((cmd) => vordruckSectionOf(cmd.nr) === "hinten");
-  const struckCount = COMMANDS.filter((cmd) => vordruckStruck(cmd.nr)).length;
   const selectedCard = command
     ? `
   <div class="selected-command">
@@ -1016,11 +1013,70 @@ function orderForm(command) {
   </div>`
     : "";
 
+  const signature = `
+      <footer class="vordruck-foot">
+        <div class="vordruck-sign">
+          <span>Name Anweisender / Unterschrift</span>
+          <strong>${e(state.profile?.discord_username || "")}</strong>
+        </div>
+        <div class="vordruck-sign">
+          <span>Standortbestätigung Tf</span>
+          <strong>wird im Zugfunk bestätigt</strong>
+        </div>
+        <div class="vordruck-note">Vordruck nach DB-Muster · Übungsbetrieb DVN</div>
+      </footer>`;
+
+  const view = state.vordruckView === "fill" ? "fill" : "scan";
+
   return `
   ${selectedCard}
 
-  <form id="befehl-form" novalidate>
-    <article class="vordruck" aria-label="Befehlsvordruck ${command ? "Befehl " + e(command.nr) : ""}">
+  <div class="vordruck-toolbar">
+    <div class="vordruck-view-nav" role="group" aria-label="Vordruck-Ansicht">
+      <button type="button" class="link-btn ${view === "scan" ? "is-active" : ""}" data-action="vordruck-view" data-view="scan">Kompletter Vordruck (Bild)</button>
+      <button type="button" class="link-btn ${view === "fill" ? "is-active" : ""}" data-action="vordruck-view" data-view="fill">Digital ausfüllen</button>
+    </div>
+    ${
+      view === "fill"
+        ? `<div class="vordruck-page-nav" role="group" aria-label="Vordruck-Seiten">
+      <button type="button" class="link-btn" data-action="vordruck-page" data-page="1">Seite 1 · Vorderseite</button>
+      <button type="button" class="link-btn" data-action="vordruck-page" data-page="2">Seite 2 · Rückseite</button>
+    </div>
+    <button type="button" class="link-btn" data-action="vordruck-fullscreen">Vollbild</button>`
+        : ""
+    }
+  </div>
+
+  <section class="vordruck-scan ${view === "scan" ? "" : "is-hidden"}" aria-label="Kompletter Original-Befehlsvordruck als Bild">
+    <p class="vordruck-scan-hint">
+      Das ist der komplette Befehlsvordruck mit Vorder- und Rückseite. Sieh ihn dir an –
+      danach trägst du deine Angaben im digitalen Vordruck ein und kreuzt deinen Befehl an.
+    </p>
+    <figure class="vordruck-scan-page">
+      <a href="assets/vordruck-seite-1.png" target="_blank" rel="noopener">
+        <img src="assets/vordruck-seite-1.png?v=20261116i" alt="Befehlsvordruck Seite 1, Vorderseite mit den Befehlen 1 bis 9 und der Kopfzeile" />
+      </a>
+      <figcaption>Seite 1 · Vorderseite (Befehle 1 – 9) · zum Vergrößern anklicken</figcaption>
+    </figure>
+    <figure class="vordruck-scan-page">
+      <a href="assets/vordruck-seite-2.png" target="_blank" rel="noopener">
+        <img src="assets/vordruck-seite-2.png?v=20261116i" alt="Befehlsvordruck Seite 2, Rückseite mit den nationalen Befehlen 21 bis 95" />
+      </a>
+      <figcaption>Seite 2 · Rückseite (Befehle 21 – 95) · zum Vergrößern anklicken</figcaption>
+    </figure>
+    <div class="vordruck-scan-cta">
+      <button type="button" class="btn btn-primary btn-lg" data-action="vordruck-view" data-view="fill">
+        Vordruck jetzt ausfüllen
+      </button>
+    </div>
+  </section>
+
+  <form id="befehl-form" class="vordruck-form ${view === "fill" ? "" : "is-hidden"}" novalidate>
+    <div class="vordruck-fullscreen-bar">
+      <button type="button" class="btn btn-secondary btn-sm" data-action="vordruck-fullscreen">Vollbild beenden</button>
+    </div>
+    <article class="vordruck vordruck-page" id="vordruck-seite-1"
+      aria-label="Befehlsvordruck Seite 1, Vorderseite${command ? ", Befehl " + e(command.nr) : ""}">
       <header class="vordruck-head">
         <div class="vordruck-brand">
           <span class="vordruck-logo" aria-hidden="true">DB</span>
@@ -1034,49 +1090,33 @@ function orderForm(command) {
           <strong>${e((order && order.header && order.header.Z) || "")}</strong>
         </div>
       </header>
- 
+
       <div class="vordruck-grid">
         ${ORDER_HEADER_FIELDS.map(vordruckHeaderCell).join("")}
       </div>
- 
-      <div class="vordruck-toolbar">
-        <span>Befehl ankreuzen · Kopfzeile ausfüllen · nicht zutreffende Zeilen durchstreichen.</span>
-        <span class="vordruck-strike-count">${struckCount} Zeile${struckCount === 1 ? "" : "n"} durchgestrichen</span>
-        <button type="button" class="link-btn" data-action="strike-others">Alle anderen durchstreichen</button>
-        <button type="button" class="link-btn" data-action="show-vordruck-image">Original-Vordruck anzeigen</button>
-        <button type="button" class="link-btn" data-action="vordruck-fullscreen">Vollscreen</button>
-      </div>
- 
-      ${vordruckSection(
-        "Befehle 1 – 9",
-        "Vorderseite · standardisierte Befehle (TSI OPE)",
-        vorne,
-        state.queue.length === 1
-          ? "1/1"
-          : `${state.index + 1} / ${state.queue.length}`,
-        Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "vorne"
-      )}
-      ${vordruckSection(
-        "Befehle 21 – 95",
-        "Rückseite · nationale Befehle der DB",
-        hinten,
-        state.queue.length === 1
-          ? "1/1"
-          : `${state.index + 1} / ${state.queue.length}`,
-        Boolean(state.current.command) && vordruckSectionOf(command.nr) !== "hinten"
-      )}
 
-      <footer class="vordruck-foot">
-        <div class="vordruck-sign">
-          <span>Name Anweisender / Unterschrift</span>
-          <strong>${e(state.profile?.discord_username || "")}</strong>
+      ${vordruckSection("Befehle 1 – 9", "Vorderseite · standardisierte Befehle (TSI OPE)", vorne, "Seite 1 von 2")}
+      ${signature}
+    </article>
+
+    <article class="vordruck vordruck-page" id="vordruck-seite-2"
+      aria-label="Befehlsvordruck Seite 2, Rückseite${command ? ", Befehl " + e(command.nr) : ""}">
+      <header class="vordruck-head vordruck-head-slim">
+        <div class="vordruck-brand">
+          <span class="vordruck-logo" aria-hidden="true">DB</span>
+          <div>
+            <strong>Befehlsvordruck · Rückseite</strong>
+            <small>gemäß Ril 408.2411 V01</small>
+          </div>
         </div>
-        <div class="vordruck-sign">
-          <span>Standortbestätigung Tf</span>
-          <strong>wird im Zugfunk bestätigt</strong>
+        <div class="vordruck-kennung">
+          <span>Seite</span>
+          <strong>2 von 2</strong>
         </div>
-        <div class="vordruck-note">Vordruck nach DB-Muster · Übungsbetrieb DVN</div>
-      </footer>
+      </header>
+
+      ${vordruckSection("Befehle 21 – 95", "Rückseite · nationale Befehle der DB", hinten, "Seite 2 von 2")}
+      ${signature}
     </article>
 
     <div class="order-actions">
@@ -1099,16 +1139,16 @@ function orderPanel(scenario) {
     </div>
     <span class="step-chip">${state.index + 1}<span>/${state.queue.length}</span></span>
   </div>
-  <p class="order-hint">Kreuze den passenden Befehl im Vordruck an, trage die Angaben auf den Linien ein und streiche die nicht zutreffenden Zeilen durch.</p>
+  <p class="order-hint">Sieh dir zuerst den kompletten Vordruck als Bild an, wähle dann deinen Befehl selbst aus und trage deine Angaben im digitalen Vordruck ein.</p>
   ${orderForm(command)}`;
 }
 
 function trainScreen() {
   const scenario = state.queue[state.index];
   return `
-  <div class="train-layout">
+  <div class="train-vordruck">
     ${situationCard(scenario)}
-    <section class="card order-card" id="order-panel" aria-live="polite">
+    <section class="card order-card order-card-wide" id="order-panel" aria-live="polite">
       ${orderPanel(scenario)}
     </section>
   </div>`;
@@ -1235,7 +1275,7 @@ function resultScreen() {
         !ev.formOk
           ? `<div class="wrong-banner">
               <span class="wrong-icon">!</span>
-              <p><strong>Vordruck unvollständig oder fehlerhaft.</strong> Kopfzeile oder Durchstreichungen stimmen nicht. Die Befehlsbewertung bleibt unverändert.</p>
+              <p><strong>Vordruck unvollständig oder fehlerhaft.</strong> Die Kopfzeile stimmt nicht. Die Befehlsbewertung bleibt unverändert.</p>
             </div>`
           : ""
       }
@@ -1442,7 +1482,7 @@ function guideScreen() {
         </table>
 
         <h3>2. Befehle auswählen und Felder ausfüllen</h3>
-        <p>Kreuze den passenden Befehl im Vordruck an und trage die Angaben auf den Linien ein. Nicht zutreffende Zeilen sind durchzustreichen.</p>
+        <p>Kreuze den passenden Befehl im Vordruck selbst an und fülle die Kopfzeile sowie die Linien mit eigenen Einträgen aus. Es muss nichts durchgestrichen werden.</p>
 
         <h3>3. Punktverteilung</h3>
         <p>${pointDistr.training}</p>
@@ -2366,6 +2406,7 @@ function startTraining() {
   state.index = 0;
   state.answers = [];
   state.current = { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" };
+  state.vordruckView = "scan";
   state.startedAt = Date.now();
   state.endedAt = null;
   state.screen = "train";
@@ -2381,6 +2422,7 @@ function nextSituation() {
   }
   state.index += 1;
   state.current = { command: null, fields: {}, measures: {}, struck: {}, header: {}, note: "" };
+  state.vordruckView = "scan";
   state.screen = "train";
   render();
 }
@@ -2592,32 +2634,31 @@ app.addEventListener("click", async (event) => {
       state.current.note = "";
       refreshOrderPanel();
     }
-    if (action === "strike-row") {
-      const nr = actionEl.dataset.row;
-      state.current.struck = state.current.struck || {};
-      state.current.struck[nr] = !vordruckStruck(nr);
+    if (action === "strike-row" || action === "strike-others") {
+      // Durchstreichen ist deaktiviert – Befehle bleiben offen.
+      return;
+    }
+    if (action === "vordruck-view") {
+      state.vordruckView = actionEl.dataset.view === "fill" ? "fill" : "scan";
       refreshOrderPanel();
+      return;
     }
     if (action === "show-vordruck-image") {
-      window.open("assets/vordruck-front.png", "_blank", "noopener");
+      window.open("assets/vordruck-seite-1.png", "_blank", "noopener");
+      return;
+    }
+    if (action === "vordruck-page") {
+      const page = document.getElementById(`vordruck-seite-${actionEl.dataset.page}`);
+      if (page) page.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (action === "vordruck-fullscreen") {
-      const vordruck = document.querySelector(".vordruck");
-      if (vordruck) {
-        vordruck.classList.toggle("vordruck-fullscreen");
+      const form = document.querySelector(".vordruck-form");
+      if (form) {
+        form.classList.toggle("vordruck-fullscreen");
+        document.body.classList.toggle("vordruck-fullscreen-open", form.classList.contains("vordruck-fullscreen"));
       }
       return;
-    }
-    if (action === "strike-others") {
-      state.current.struck = {};
-      const selected = state.current.command;
-      const page = selected ? vordruckSectionOf(selected) : null;
-      COMMANDS.forEach((cmd) => {
-        if (page && vordruckSectionOf(cmd.nr) !== page) return;
-        if (cmd.nr !== selected) state.current.struck[cmd.nr] = true;
-      });
-      refreshOrderPanel();
     }
     if (action === "logout") await signOut();
     if (action === "refresh-status") {
@@ -2683,6 +2724,11 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  const fieldInput = event.target.closest("input[data-field]");
+  if (fieldInput && fieldInput.closest(".vordruck-form")) {
+    state.current.fields[fieldInput.dataset.field] = fieldInput.value;
+    return;
+  }
   const header = event.target.closest("[data-header]");
   if (header) {
     state.current.header = state.current.header || {};

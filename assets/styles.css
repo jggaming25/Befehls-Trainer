@@ -6267,3 +6267,359 @@ dialog::backdrop {
     width: auto;
   }
 }
+
+/* ==========================================================================
+   Befehlsvordruck: zwei eigenständige Seiten in voller Breite
+   Große, gut lesbare Beschriftung und frei ausfüllbare Linien.
+   ========================================================================== */
+.train-vordruck {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.train-vordruck .order-card {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  padding: 22px 24px;
+}
+
+.vordruck-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.vordruck-page {
+  scroll-margin-top: 96px;
+  font-size: 13px;
+  overflow: visible;
+}
+
+/* Das alte, verdrehte Wasserzeichen wird nicht mehr gebraucht: Der komplette
+   Original-Vordruck wird als echtes Bild angezeigt. */
+.vordruck-page::before {
+  content: none;
+}
+
+/* Ansicht 1: kompletter Vordruck als Bild */
+.vordruck-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.vordruck-scan.is-hidden,
+.vordruck-form.is-hidden {
+  display: none;
+}
+
+.vordruck-scan-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.vordruck-scan-page {
+  margin: 0;
+}
+
+.vordruck-scan-page a {
+  display: block;
+}
+
+.vordruck-scan-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(17, 22, 29, 0.1);
+}
+
+.vordruck-scan-page figcaption {
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.vordruck-scan-cta {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 10px;
+}
+
+.vordruck-view-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vordruck-view-nav .link-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 11.5px;
+  text-decoration: none;
+  color: var(--ink-2);
+}
+
+.vordruck-view-nav .link-btn.is-active {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+.vordruck-head {
+  padding: 12px 18px;
+}
+
+.vordruck-brand strong {
+  font-size: 15px;
+}
+
+.vordruck-brand small {
+  font-size: 9.5px;
+}
+
+.vordruck-kennung span {
+  font-size: 9px;
+}
+
+.vordruck-kennung strong {
+  font-size: 13.5px;
+}
+
+.vordruck-logo {
+  width: 38px;
+  height: 38px;
+  font-size: 17px;
+}
+
+.vordruck-cell {
+  min-height: 58px;
+  padding: 8px 12px 10px;
+  gap: 0 8px;
+}
+
+.vordruck-code {
+  min-width: 19px;
+  height: 19px;
+  font-size: 10px;
+}
+
+.vordruck-cell-label {
+  font-size: 9.5px;
+}
+
+.vordruck-input {
+  font-size: 13px;
+  padding: 3px 5px;
+}
+
+.vordruck-cell-hint {
+  font-size: 8.5px;
+}
+
+.vordruck-seite-head {
+  padding: 8px 16px;
+}
+
+.vordruck-seite-head strong {
+  font-size: 11px;
+}
+
+.vordruck-seite-head span {
+  font-size: 9.5px;
+}
+
+.vrow {
+  grid-template-columns: 34px 40px minmax(0, 1fr);
+}
+
+.vrow-tick {
+  padding-top: 13px;
+}
+
+.vrow-box {
+  width: 19px;
+  height: 19px;
+}
+
+.vrow-box::before,
+.vrow-box::after {
+  width: 14px;
+  height: 2px;
+}
+
+.vrow-nr {
+  padding: 12px 6px 12px 0;
+  font-size: 14px;
+}
+
+.vrow-body {
+  padding: 11px 18px 13px 6px;
+}
+
+.vrow-head strong {
+  font-size: 14px;
+}
+
+.vrow-desc {
+  font-size: 12px;
+}
+
+.vrow-fill {
+  margin-top: 10px;
+  padding: 12px 14px;
+}
+
+.vrow-template {
+  font-size: 11.5px;
+}
+
+.vfill-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+}
+
+.vfill-label {
+  font-size: 10px;
+}
+
+.vfill-code {
+  font-size: 9px;
+}
+
+.vfill-control input {
+  min-height: 32px;
+  padding: 5px 4px;
+  font-size: 14px;
+}
+
+.vfill-note {
+  margin-top: 12px;
+}
+
+.vordruck-measures legend {
+  font-size: 10px;
+}
+
+.vordruck-measures .check-text {
+  font-size: 12.5px;
+}
+
+.vordruck-foot {
+  padding: 12px 18px;
+}
+
+.vordruck-sign span {
+  font-size: 9px;
+}
+
+.vordruck-sign strong {
+  font-size: 13px;
+}
+
+.vordruck-note {
+  font-size: 9px;
+}
+
+/* Seite 2 zeigt das Originalbild der Rückseite als Wasserzeichen */
+#vordruck-seite-2::before {
+  background-image: url("vordruck-back.png?v=20261116a");
+}
+
+.vordruck-page-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.vordruck-page-nav .link-btn {
+  font-size: 11px;
+}
+
+/* Vollbild über die ganze Seite */
+.vordruck-fullscreen-bar {
+  display: none;
+}
+
+.vordruck-form.vordruck-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  overflow-y: auto;
+  padding: 18px 18px 40px;
+  background: #eef1f5;
+}
+
+.vordruck-form.vordruck-fullscreen .vordruck {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.vordruck-form.vordruck-fullscreen .order-actions {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.vordruck-form.vordruck-fullscreen .vordruck-fullscreen-bar {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  justify-content: flex-end;
+}
+
+body.vordruck-fullscreen-open {
+  overflow: hidden;
+}
+
+/* Die fadeUp-Animation hinterlässt eine Transform-Matrix. Diese erzeugt einen
+   neuen Bezugsrahmen und würde position: fixed auf die Karte begrenzen. */
+body.vordruck-fullscreen-open #order-panel,
+body.vordruck-fullscreen-open .order-card {
+  animation: none;
+  transform: none;
+}
+
+@media (max-width: 900px) {
+  .train-vordruck .order-card {
+    padding: 16px;
+  }
+
+  .vordruck-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vfill-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .vordruck-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vordruck-cell {
+    min-height: 0;
+  }
+
+  .vrow {
+    grid-template-columns: 26px 30px minmax(0, 1fr);
+  }
+
+  .vordruck-form.vordruck-fullscreen {
+    padding: 10px 10px 30px;
+  }
+}
