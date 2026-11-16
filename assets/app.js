@@ -1054,13 +1054,13 @@ function orderForm(command) {
     </p>
     <figure class="vordruck-scan-page">
       <a href="assets/vordruck-seite-1.png" target="_blank" rel="noopener">
-        <img src="assets/vordruck-seite-1.png?v=20261116i" alt="Befehlsvordruck Seite 1, Vorderseite mit den Befehlen 1 bis 9 und der Kopfzeile" />
+        <img src="assets/vordruck-seite-1.png?v=20261116j" alt="Befehlsvordruck Seite 1, Vorderseite mit den Befehlen 1 bis 9 und der Kopfzeile" />
       </a>
       <figcaption>Seite 1 · Vorderseite (Befehle 1 – 9) · zum Vergrößern anklicken</figcaption>
     </figure>
     <figure class="vordruck-scan-page">
       <a href="assets/vordruck-seite-2.png" target="_blank" rel="noopener">
-        <img src="assets/vordruck-seite-2.png?v=20261116i" alt="Befehlsvordruck Seite 2, Rückseite mit den nationalen Befehlen 21 bis 95" />
+        <img src="assets/vordruck-seite-2.png?v=20261116j" alt="Befehlsvordruck Seite 2, Rückseite mit den nationalen Befehlen 21 bis 95" />
       </a>
       <figcaption>Seite 2 · Rückseite (Befehle 21 – 95) · zum Vergrößern anklicken</figcaption>
     </figure>
