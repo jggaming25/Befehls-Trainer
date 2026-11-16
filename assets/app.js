@@ -1481,8 +1481,8 @@ function guideScreen() {
           <tr><td class="guide-cell guide-cell-Z">Z – Eindeutige Kennung</td><td class="guide-explain">${fieldExplanations.Z}</td></tr>
         </table>
 
-        <h3>2. Befehle auswählen und Felder ausfüllen</h3>
-        <p>Kreuze den passenden Befehl im Vordruck selbst an und fülle die Kopfzeile sowie die Linien mit eigenen Einträgen aus. Es muss nichts durchgestrichen werden.</p>
+        <h3>2. Vordruck ansehen, Befehl wählen und ausfüllen</h3>
+        <p>Zuerst bekommst du den kompletten Original-Vordruck als Bild zu sehen (Vorderseite und Rückseite). Danach wechselst du auf „Digital ausfüllen“, kreuzt den passenden Befehl selbst an – kein Befehl ist vorausgewählt – und trägst die Kopfzeile sowie die Linien in eigenen Worten ein. Es muss nichts durchgestrichen werden.</p>
 
         <h3>3. Punktverteilung</h3>
         <p>${pointDistr.training}</p>
